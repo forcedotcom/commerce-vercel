@@ -376,14 +376,36 @@ export async function getCollectionProducts({
   console.log('getCollectionProducts');
 
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
+  const sortedCategories = categoriesHavingProducts.sort((a, b) =>
+    a.categoryName.localeCompare(b.categoryName)
+  );
+  const limitedCategories = getLimitedCategories(sortedCategories);
 
   // get products from all categories
-  const allProducts = await fetchCategoryProducts(categoriesHavingProducts);
-  let firstTwentyProducts = allProducts.slice(0, 20);
-
-  firstTwentyProducts = await fetchProductsPricing(firstTwentyProducts);
-  return firstTwentyProducts;
+  let allProducts = await fetchCategoryProducts(limitedCategories);
+  allProducts = await fetchProductsPricing(allProducts);
+  return allProducts;
 }
+
+function getLimitedCategories(categories: Category[], maxProducts = 10): Category[] {
+  let selectedCategories: Category[] = [];
+  let totalProducts = 0;
+
+  for (const category of categories) {
+      const productsCount = Number(category.numberOfProducts); // Convert to number
+
+      // Always include at least one category
+      if (selectedCategories.length === 0 || totalProducts + productsCount <= maxProducts) {
+          selectedCategories.push(category);
+          totalProducts += productsCount;
+      } else {
+          break;
+      }
+  }
+
+  return selectedCategories;
+}
+
 
 export async function getAllCategoryDetails() {
   // get parent categories
@@ -658,7 +680,10 @@ export async function getCollections(): Promise<Collection[]> {
 export async function getMenu(handle: string): Promise<Menu[]> {
   console.log('getMenu');
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
-  return categoriesHavingProducts.slice(0, 3).map(({ categoryId, categoryName }) => ({
+  const sortedCategories = categoriesHavingProducts.sort((a, b) =>
+    a.categoryName.localeCompare(b.categoryName)
+  );
+  return sortedCategories.slice(0, 3).map(({ categoryId, categoryName }) => ({
     title: categoryName,
     path: `category/${categoryId}`,
   }));
