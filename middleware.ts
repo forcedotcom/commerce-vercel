@@ -19,5 +19,6 @@ export const config = {
   matcher: [
     '/',
     '/product/:path*',
+    '/search/:path*',
   ],
 };

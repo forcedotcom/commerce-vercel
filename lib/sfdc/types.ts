@@ -276,7 +276,7 @@ export type Category = {
   parentCategoryId?: string;
   categoryName: string;
   categoryId: string;
-  numberOfProducts: number;
+  numberOfProducts?: number;
 };
 
 export type PricingApiResponse = {
