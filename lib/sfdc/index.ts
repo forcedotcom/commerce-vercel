@@ -353,15 +353,7 @@ function mapCartItem(apiCartItem: any): CartItem {
 
 export async function getCollection(handle: string): Promise<Collection | undefined> {
   console.log('getCollection');
-  const res = await shopifyFetch<ShopifyCollectionOperation>({
-    query: getCollectionQuery,
-    tags: [TAGS.collections],
-    variables: {
-      handle
-    }
-  });
-
-  return reshapeCollection(res.body.data.collection);
+  return undefined;
 }
 
 export async function getCollectionProducts({
@@ -373,18 +365,29 @@ export async function getCollectionProducts({
   reverse?: boolean;
   sortKey?: string;
 }): Promise<Product[]> {
-  console.log('getCollectionProducts');
+  console.log('getCollectionProducts', collection);
+  if (collection === 'hidden-homepage-featured-items' || collection === 'hidden-homepage-carousel') {
+    const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
+    const sortedCategories = categoriesHavingProducts.sort((a, b) =>
+      a.categoryName.localeCompare(b.categoryName)
+    );
+    const limitedCategories = getLimitedCategories(sortedCategories);
 
-  const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
-  const sortedCategories = categoriesHavingProducts.sort((a, b) =>
-    a.categoryName.localeCompare(b.categoryName)
-  );
-  const limitedCategories = getLimitedCategories(sortedCategories);
-
-  // get products from all categories
-  let allProducts = await fetchCategoryProducts(limitedCategories);
-  allProducts = await fetchProductsPricing(allProducts);
-  return allProducts;
+    // get products from all categories
+    let allProducts = await fetchCategoryProducts(limitedCategories);
+    allProducts = await fetchProductsPricing(allProducts);
+    return allProducts;
+  } else {
+    const categories: Category[] = [
+      {
+        categoryId: collection,
+        categoryName: ''
+      }
+    ]
+    let categoryProducts = await fetchCategoryProducts(categories)
+    categoryProducts = await fetchProductsPricing(categoryProducts);
+    return categoryProducts;
+  }
 }
 
 function getLimitedCategories(categories: Category[], maxProducts = 10): Category[] {
@@ -392,15 +395,15 @@ function getLimitedCategories(categories: Category[], maxProducts = 10): Categor
   let totalProducts = 0;
 
   for (const category of categories) {
-      const productsCount = Number(category.numberOfProducts); // Convert to number
+    const productsCount = Number(category.numberOfProducts); // Convert to number
 
-      // Always include at least one category
-      if (selectedCategories.length === 0 || totalProducts + productsCount <= maxProducts) {
-          selectedCategories.push(category);
-          totalProducts += productsCount;
-      } else {
-          break;
-      }
+    // Always include at least one category
+    if (selectedCategories.length === 0 || totalProducts + productsCount <= maxProducts) {
+      selectedCategories.push(category);
+      totalProducts += productsCount;
+    } else {
+      break;
+    }
   }
 
   return selectedCategories;
@@ -422,7 +425,7 @@ export async function getAllCategoriesHavingProducts(): Promise<Category[]> {
   const categories = await getAllCategoryDetails();
   const categoriesHavingProducts: Category[] = [];
   for (const cetagory of categories) {
-    if (cetagory.numberOfProducts > 0) {
+    if (cetagory.numberOfProducts != null &&  cetagory.numberOfProducts > 0) {
       categoriesHavingProducts.push(cetagory);
     }
   }
@@ -650,43 +653,38 @@ function extractProductVariants(apiResponse: any, pricingApiResponse: PricingApi
 
 export async function getCollections(): Promise<Collection[]> {
   console.log('getCollections');
-  const res = await shopifyFetch<ShopifyCollectionsOperation>({
-    query: getCollectionsQuery,
-    tags: [TAGS.collections]
-  });
-  const shopifyCollections = removeEdgesAndNodes(res.body?.data?.collections);
-  const collections = [
-    {
-      handle: '',
-      title: 'All',
-      description: 'All products',
-      seo: {
-        title: 'All',
-        description: 'All products'
-      },
-      path: '/search',
-      updatedAt: new Date().toISOString()
-    },
-    // Filter out the `hidden` collections.
-    // Collections that start with `hidden-*` need to be hidden on the search page.
-    ...reshapeCollections(shopifyCollections).filter(
-      (collection) => !collection.handle.startsWith('hidden')
-    )
-  ];
-
-  return collections;
-}
-
-export async function getMenu(handle: string): Promise<Menu[]> {
-  console.log('getMenu');
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
   const sortedCategories = categoriesHavingProducts.sort((a, b) =>
     a.categoryName.localeCompare(b.categoryName)
   );
-  return sortedCategories.slice(0, 3).map(({ categoryId, categoryName }) => ({
-    title: categoryName,
-    path: `category/${categoryId}`,
+  const categoryAsCollections: Collection[] = sortedCategories.map((obj) => ({
+    title: obj.categoryName,
+    handle: '',
+    description: obj.categoryName,
+    seo: {
+      title: obj.categoryName,
+      description: obj.categoryName
+    },
+    path: `/search/${obj.categoryId}`,
+    updatedAt: new Date().toISOString()
   }));
+  return categoryAsCollections;
+}
+
+export async function getMenu(handle: string): Promise<Menu[]> {
+  console.log('getMenu', handle);
+  const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
+  const sortedCategories = categoriesHavingProducts.sort((a, b) =>
+    a.categoryName.localeCompare(b.categoryName)
+  );
+  const categoryAsMenueItems = sortedCategories.map(({ categoryId, categoryName }) => ({
+    title: categoryName,
+    path: `search/${categoryId}`,
+  }));
+  if (handle === 'next-js-frontend-footer-menu' || handle === 'next-js-frontend-header-menu') {
+    return categoryAsMenueItems.slice(0, 3);
+  }
+  return categoryAsMenueItems;
 }
 
 export async function getPage(handle: string): Promise<Page> {

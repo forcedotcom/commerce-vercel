@@ -14,6 +14,7 @@ const activeAndTitles = 'bg-neutral-800 dark:bg-neutral-300';
 const items = 'bg-neutral-400 dark:bg-neutral-700';
 
 export default function Collections() {
+  console.log('Collections');
   return (
     <Suspense
       fallback={

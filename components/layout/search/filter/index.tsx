@@ -17,6 +17,7 @@ function FilterItemList({ list }: { list: ListItem[] }) {
 }
 
 export default function FilterList({ list, title }: { list: ListItem[]; title?: string }) {
+  console.log('FilterList');
   return (
     <>
       <nav>
