@@ -1,10 +1,13 @@
-import { getCollectionProducts } from 'lib/sfdc';
 import Link from 'next/link';
 import { GridTileImage } from './grid/tile';
+import { Product } from 'lib/sfdc/types';
 
-export async function Carousel() {
+type CarouselProducts = {
+  products: Product[];
+};
+
+export async function Carousel({ products }: CarouselProducts) {
   // Collections that start with `hidden-*` are hidden from the search page.
-  const products = await getCollectionProducts({ collection: 'hidden-homepage-carousel' });
 
   if (!products?.length) return null;
 
