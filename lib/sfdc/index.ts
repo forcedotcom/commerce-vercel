@@ -125,6 +125,7 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
         Authorization: `Bearer ${authToken}`
       },
       body: body ? JSON.stringify(body) : null,
+      cache: 'force-cache'
     });
     if (!response.ok) {
       // throw new Error(`HTTP error! Status: ${response.status}`);

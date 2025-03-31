@@ -1,7 +1,10 @@
 import { GridTileImage } from 'components/grid/tile';
-import { getCollectionProducts } from 'lib/sfdc';
 import type { Product } from 'lib/sfdc/types';
 import Link from 'next/link';
+
+type ThreeItemGridProducts = {
+  products: Product[];
+};
 
 function ThreeItemGridItem({
   item,
@@ -41,17 +44,14 @@ function ThreeItemGridItem({
   );
 }
 
-export async function ThreeItemGrid() {
-  // Collections that start with `hidden-*` are hidden from the search page.
-  const homepageItems = await getCollectionProducts({
-    collection: 'hidden-homepage-featured-items'
-  });
+export async function ThreeItemGrid({ products }: ThreeItemGridProducts) {
+  // Collections that start with `hidden-*` are hidden from the search pag
 
-  if (homepageItems == null) return null
+  if (products == null) return null
 
-  if (!homepageItems[0] || !homepageItems[1] || !homepageItems[2]) return null;
+  if (!products[0] || !products[1] || !products[2]) return null;
 
-  const [firstProduct, secondProduct, thirdProduct] = homepageItems;
+  const [firstProduct, secondProduct, thirdProduct] = products;
 
   return (
     <section className="mx-auto grid max-w-screen-2xl gap-4 px-4 pb-4 md:grid-cols-6 md:grid-rows-2 lg:max-h-[calc(100vh-200px)]">
