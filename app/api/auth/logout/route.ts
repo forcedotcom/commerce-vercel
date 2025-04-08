@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { deleteSfdcAuthToken } from 'app/api/auth/authUtil';
+import { deleteCartIdCookie, deleteCsrfTokenCookie, deleteSfdcAuthToken, updateIsGuestUserToDefaultInCookie } from 'app/api/auth/authUtil';
 
 export async function POST() {
-  await deleteSfdcAuthToken()
+  await deleteSfdcAuthToken();
+  await deleteCsrfTokenCookie();
+  await deleteCartIdCookie();
+  await updateIsGuestUserToDefaultInCookie();
   return NextResponse.json({ success: true }, { status: 200 });
 }

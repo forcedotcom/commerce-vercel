@@ -7,17 +7,14 @@ import { Suspense } from 'react';
 import MobileMenu from './mobile-menu';
 import Search, { SearchSkeleton } from './search';
 import { LogoutButton } from './LogoutButton';
+import { SFDC_COMMERCE_WEBSTORE_NAME } from 'lib/constants';
+import { getIsGuestUserFromCookie } from 'app/api/auth/authUtil';
 
-const { SITE_NAME } = process.env;
 
-export async function Navbar({ authToken }: { authToken: string | undefined }) {
+export async function Navbar() {
   console.log('Navbar');
-  
-  // Check for auth_token in cookies
-  if (!authToken) {
-    return null;
-  }
 
+  const isGuestUser = await getIsGuestUserFromCookie();
   const menu = await getMenu('next-js-frontend-header-menu');
 
   return (
@@ -36,7 +33,7 @@ export async function Navbar({ authToken }: { authToken: string | undefined }) {
           >
             <LogoSquare />
             <div className="ml-2 flex-none text-sm font-medium uppercase md:hidden lg:block">
-              {SITE_NAME}
+              {SFDC_COMMERCE_WEBSTORE_NAME}
             </div>
           </Link>
           {menu.length ? (
@@ -61,7 +58,7 @@ export async function Navbar({ authToken }: { authToken: string | undefined }) {
           </Suspense>
         </div>
         <div className="flex justify-end md:w-1/3">
-          <LogoutButton />
+          <LogoutButton isGuestUser={isGuestUser} />
           <CartModal />
         </div>
       </div>

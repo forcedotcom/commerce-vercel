@@ -8,7 +8,8 @@ import { cookies } from 'next/headers';
 import { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import './globals.css';
-import { getSfdcAuthToken } from 'app/api/auth/authUtil';
+import { CART_ID_COOKIE_NAME } from 'lib/constants';
+import { getCartIdFromCookie } from './api/auth/authUtil';
 
 const { TWITTER_CREATOR, TWITTER_SITE, SITE_NAME } = process.env;
 const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
@@ -40,16 +41,14 @@ export const metadata = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   console.log('RootLayout');
 
-  const authToken = await getSfdcAuthToken();
- 
-  const cartId = (await cookies()).get('cartId')?.value;
-  const cart = getCart(cartId);
+  const cartId = await getCartIdFromCookie();
+  const cart = getCart(cartId!);
 
   return (
     <html lang="en" className={GeistSans.variable}>
       <body className="bg-neutral-50 text-black selection:bg-teal-300 dark:bg-neutral-900 dark:text-white dark:selection:bg-pink-500 dark:selection:text-white">
         <CartProvider cartPromise={cart}>
-          <Navbar authToken={authToken}/>
+          <Navbar/>
           <main>
             {children}
             <Toaster closeButton />

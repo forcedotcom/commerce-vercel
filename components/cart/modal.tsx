@@ -1,7 +1,7 @@
 'use client';
 
 import { Dialog, Transition } from '@headlessui/react';
-import { ShoppingCartIcon, UserIcon } from '@heroicons/react/24/outline';
+import { ShoppingCartIcon } from '@heroicons/react/24/outline';
 import LoadingDots from 'components/loading-dots';
 import Price from 'components/price';
 import { DEFAULT_OPTION } from 'lib/constants';
@@ -29,8 +29,8 @@ export default function CartModal() {
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);
   useEffect(() => {
-    console.log('should create cart and set to cookies')
-    if (!cart) {
+    console.log('CartModal cart', cart);
+    if (!cart || !cart?.id) {
       createCartAndSetCookie();
     }
   }, [cart]);
@@ -211,15 +211,18 @@ export default function CartModal() {
 }
 
 function CheckoutButton() {
-  const { pending } = useFormStatus();
-
+  // const { pending } = useFormStatus();
+  const pending = true;
+  const buttonClasses =
+    'block w-full rounded-full bg-blue-600 p-3 text-center text-sm font-medium text-white';
+  const disabledClasses = 'cursor-not-allowed opacity-60 hover:opacity-60';
   return (
     <button
-      className="block w-full rounded-full bg-blue-600 p-3 text-center text-sm font-medium text-white opacity-90 hover:opacity-100"
       type="submit"
-      disabled={pending}
+      disabled={pending} className={clsx(buttonClasses, disabledClasses)}
     >
-      {pending ? <LoadingDots className="bg-white" /> : 'Proceed to Checkout'}
+      {/* {pending ? <LoadingDots className="bg-white" /> : 'Proceed to Checkout'} */}
+      Proceed to Checkout
     </button>
   );
 }
