@@ -71,7 +71,7 @@ export const IS_GUEST_USER_COOKIE_NAME = 'isGuestUser';
 export const GUEST_COOKIE_AGE = 365 * 24 * 60 * 60; /* one year */
 
 // CSRF Token
-export const CSRF_TOKEN_COOKIE = 'csrf-token';
+export const CSRF_TOKEN_COOKIE_NAME = 'csrf-token';
 
 export const CART_ID_COOKIE_NAME = 'cartId';
 

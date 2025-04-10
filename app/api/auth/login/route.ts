@@ -1,7 +1,7 @@
 import { encode } from 'js-base64';
 import {
     APEX_EXECUTE,
-    CSRF_TOKEN_COOKIE,
+    CSRF_TOKEN_COOKIE_NAME,
     CSRF_TOKEN_URL,
     IS_GUEST_USER_COOKIE_NAME,
     SFDC_AUTH_TOKEN_COOKIE_NAME,
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
 
     // Store CSRF token (and optionally firstName, guestUser, etc.)
     res.cookies.set({
-        name: CSRF_TOKEN_COOKIE,
+        name: CSRF_TOKEN_COOKIE_NAME,
         value: encode(csrfToken),
         httpOnly: false, // MUST be accessible to client-side JS
         secure: true,

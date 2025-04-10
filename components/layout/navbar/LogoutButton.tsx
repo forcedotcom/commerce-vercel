@@ -5,7 +5,6 @@ import clsx from 'clsx';
 import { useRouter } from 'next/navigation';
 
 export function LogoutButton({ isGuestUser }: { isGuestUser: boolean | null }) {
-  console.log('LogoutButton isGuestUser', isGuestUser);
   const router = useRouter();
 
   const handleLogout = async () => {

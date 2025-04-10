@@ -14,7 +14,7 @@ import {
   SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME,
   SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME,
   SESSION_CONTEXT_URL,
-  CSRF_TOKEN_COOKIE,
+  CSRF_TOKEN_COOKIE_NAME,
 } from 'lib/constants';
 import { isShopifyError } from 'lib/type-guards';
 import { revalidateTag } from 'next/cache';
@@ -132,8 +132,7 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
       }
       const csrfToken = await getCsrfTokenFromCookie();
       if (csrfToken && endpoint.match('cart-items') && (httpMethod === HttpMethod.POST || httpMethod === HttpMethod.PATCH || httpMethod === HttpMethod.DELETE)) {
-        headers[CSRF_TOKEN_COOKIE] = csrfToken;
-        console.log('cart-items headers', headers);
+        headers[CSRF_TOKEN_COOKIE_NAME] = csrfToken;
       }
     }
 
@@ -194,7 +193,6 @@ async function extractGuestCartSessionIdFromResponseHeaders(response: any) {
     const match = setCookieHeaders.match(new RegExp(`GuestCartSessionId_${SFDC_COMMERCE_WEBSTORE_ID}=([^;]+)`));
     if (match) {
       guestCartSessionId = match[1] ? match[1] : ''; // Extract only the session ID (xxxxx)
-      console.log('guestCartSessionId', guestCartSessionId);
       (await cookies()).set({
         name: SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME,
         value: guestCartSessionId,
@@ -313,7 +311,6 @@ export async function addToCart(
     quantity: lines.quantity,
     type: lines.type,
   };
-  console.log('addToCart requestBody', requestBody);
   const response = await makeSfdcApiCall(endpoint, HttpMethod.POST, requestBody);
   return mapCart(response);
 }

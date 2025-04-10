@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { CART_ID_COOKIE_NAME, CSRF_TOKEN_COOKIE, IS_GUEST_USER_COOKIE_NAME, SFDC_AUTH_TOKEN_COOKIE_NAME, SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME, SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME } from '../../../lib/constants';
+import { CART_ID_COOKIE_NAME, CSRF_TOKEN_COOKIE_NAME, IS_GUEST_USER_COOKIE_NAME, SFDC_AUTH_TOKEN_COOKIE_NAME, SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME, SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME } from '../../../lib/constants';
 import { v4 as uuidv4 } from 'uuid';
 import { NextRequest } from 'next/server';
 import { decode } from 'js-base64';
@@ -9,7 +9,7 @@ export async function getSfdcAuthToken(): Promise<string | undefined> {
 }
 
 export async function getCsrfTokenFromCookie(): Promise<string | null> {
-    const cookie = (await cookies()).get(CSRF_TOKEN_COOKIE)?.value;
+    const cookie = (await cookies()).get(CSRF_TOKEN_COOKIE_NAME)?.value;
     if (!cookie) return null;
     return decode(cookie);
 }
@@ -42,7 +42,7 @@ export async function deleteCartIdCookie(): Promise<void> {
 }
 
 export async function deleteCsrfTokenCookie(): Promise<void> {
-    (await cookies()).delete(CSRF_TOKEN_COOKIE);
+    (await cookies()).delete(CSRF_TOKEN_COOKIE_NAME);
 }
 
 export function generateGuestUuid() {
