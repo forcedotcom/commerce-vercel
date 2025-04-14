@@ -171,7 +171,6 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
 
     if (!response.ok) {
       console.error('HTTP error! ', response);
-      throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
     // extract guest cart session id from response and set it to cookie
@@ -182,7 +181,6 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
     return text ? JSON.parse(text) : null;
   } catch (error) {
     console.error('Fetch Error:', error);
-    throw error;
   }
 }
 

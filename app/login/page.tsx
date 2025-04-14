@@ -31,7 +31,7 @@ export default function LoginPage() {
 
   return (
     <div className="my-login-page flex min-h-[calc(100vh-6rem)] items-center justify-center p-6">
-      <div className="w-full max-w-lg rounded-lg border-[10px] border-gray-400 bg-white p-8 shadow-2xl dark:bg-neutral-900">
+      <div className="w-full max-w-lg rounded-lg border-[4px] border-gray-400 bg-white p-8 shadow-2xl dark:bg-neutral-900">
         <h1 className="mb-2 text-center text-3xl font-bold text-[#029CE3]">Login</h1>
         <p className="mb-6 text-center text-gray-600">
           Authenticate to access your Vercel integrated Salesforce Commerce Webstore.
