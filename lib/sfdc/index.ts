@@ -1,7 +1,5 @@
 import {
   HIDDEN_PRODUCT_TAG,
-  SFDC_COMMERCE_WEBSTORE_URL,
-  SFDC_SERVICES_ENDPOINT,
   CARTS_CURRENT_URL,
   CARTS_CURRENT_ITEMS_URL,
   SFDC_STORE_CATEGORY_PRODUCTS_SEARCH_ENDPOINT,
@@ -10,15 +8,18 @@ import {
   SFDC_STORE_PRODUCT_DETAILS_ENDPOINT,
   SFDC_STORE_PRODUCTS_PRICING_ENDPOINT,
   TAGS,
+  SFDC_COMMERCE_WEBSTORE_API_URL,
+  SFDC_AUTH_TOKEN_COOKIE_NAME,
+  SFDC_COMMERCE_WEBSTORE_ID,
+  SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME,
+  SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME,
+  SESSION_CONTEXT_URL,
+  CSRF_TOKEN_COOKIE_NAME,
 } from 'lib/constants';
 import { isShopifyError } from 'lib/type-guards';
 import { revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getCollectionQuery,
-  getCollectionsQuery
-} from './queries/collection';
 import { getPageQuery, getPagesQuery } from './queries/page';
 import {
   getProductsQuery
@@ -32,8 +33,6 @@ import {
   Page,
   Product,
   ShopifyCollection,
-  ShopifyCollectionOperation,
-  ShopifyCollectionsOperation,
   ShopifyPageOperation,
   ShopifyPagesOperation,
   ShopifyProduct,
@@ -41,13 +40,9 @@ import {
   Category,
   ProductOption,
   PricingApiResponse,
-  CartItem
+  CartItem,
 } from './types';
-import { getSfdcAuthToken } from 'app/api/auth/authUtil';
-
-const SFDC_ACCESS_TOKEN = process.env.SFDC_ACCESS_TOKEN!;
-
-const SFDC_COMMERCE_WEBSTORE_ID = process.env.SFDC_COMMERCE_WEBSTORE_ID!;
+import { getCsrfTokenFromCookie, getGuestCartSessionUuid, getGuestEssentialUuidFromCookie, getIsGuestUserFromCookie, getSfdcAuthToken } from 'app/api/auth/authUtil';
 
 export enum HttpMethod {
   GET = 'GET',
@@ -73,11 +68,11 @@ export async function shopifyFetch<T>({
   variables?: ExtractVariables<T>;
 }): Promise<{ status: number; body: T } | never> {
   try {
-    const result = await fetch(SFDC_SERVICES_ENDPOINT, {
+    const result = await fetch(SFDC_COMMERCE_WEBSTORE_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + SFDC_ACCESS_TOKEN,
+        Authorization: 'Bearer ' + SFDC_AUTH_TOKEN_COOKIE_NAME,
         ...headers
       },
       body: JSON.stringify(query),
@@ -112,30 +107,98 @@ export async function shopifyFetch<T>({
   }
 }
 
-async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: object): Promise<any> {
+async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: object, req?: NextRequest): Promise<any> {
   try {
-    const authToken = await getSfdcAuthToken();
-    if (!authToken) {
-      return;
+    // get is guest user from cookie
+    const isGuestUserHeader = req?.headers.get('x-guest-user') ?? null;
+    const isGuestUser =
+      isGuestUserHeader !== null
+        ? JSON.parse(isGuestUserHeader)
+        : await getIsGuestUserFromCookie();
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Authenticated User
+    if (!isGuestUser) {
+      const cookies = [];
+      const authToken = await getSfdcAuthToken();
+      if (authToken) {
+        cookies.push(`${SFDC_AUTH_TOKEN_COOKIE_NAME}=${authToken}`);
+      }
+      if (cookies.length) {
+        headers['Cookie'] = cookies.join('; ');
+      }
+      const csrfToken = await getCsrfTokenFromCookie();
+      if (csrfToken && endpoint.match('cart-items') && (httpMethod === HttpMethod.POST || httpMethod === HttpMethod.PATCH || httpMethod === HttpMethod.DELETE)) {
+        headers[CSRF_TOKEN_COOKIE_NAME] = csrfToken;
+      }
     }
+
+    // Guest User
+    if (isGuestUser) {
+      const cookies = [];
+
+      // add cart cookies in request headres
+      if (endpoint.match('carts')) {
+        const guestUuid =
+          req?.headers.get('x-guest-uuid') ??
+          (await getGuestEssentialUuidFromCookie());
+        if (guestUuid) {
+          cookies.push(`${SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME}=${guestUuid}`);
+        }
+        const guestCartSessionUuid = await getGuestCartSessionUuid(req);
+        if (guestCartSessionUuid) {
+          cookies.push(`${SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME}=${guestCartSessionUuid}`);
+        }
+      }
+      if (cookies.length) {
+        headers['Cookie'] = cookies.join('; ');
+      }
+    }
+
+    endpoint += endpoint.includes('?')
+      ? `&isGuest=${isGuestUser ? 'true' : 'false'}`
+      : `?isGuest=${isGuestUser ? 'true' : 'false'}`;
+
     const response = await fetch(endpoint, {
       method: httpMethod,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`
-      },
+      headers,
       body: body ? JSON.stringify(body) : null,
-      cache: 'force-cache'
+      credentials: 'include'
     });
+
     if (!response.ok) {
-      // throw new Error(`HTTP error! Status: ${response.status}`);
-      console.error('!response.ok:', response);
+      console.error('HTTP error! ', response);
+    }
+
+    // extract guest cart session id from response and set it to cookie
+    if (endpoint.match('carts')) {
+      await extractGuestCartSessionIdFromResponseHeaders(response);
     }
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
     console.error('Fetch Error:', error);
-    // throw error;
+  }
+}
+
+async function extractGuestCartSessionIdFromResponseHeaders(response: any) {
+  const setCookieHeaders = response.headers?.get('set-cookie') || '';
+  let guestCartSessionId = '';
+  if (typeof window === 'undefined' && setCookieHeaders) {
+    const match = setCookieHeaders.match(new RegExp(`GuestCartSessionId_${SFDC_COMMERCE_WEBSTORE_ID}=([^;]+)`));
+    if (match) {
+      guestCartSessionId = match[1] ? match[1] : ''; // Extract only the session ID (xxxxx)
+      (await cookies()).set({
+        name: SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME,
+        value: guestCartSessionId,
+        httpOnly: true,
+        secure: true,
+        path: '/',
+      });
+    }
   }
 }
 
@@ -229,7 +292,7 @@ const mapProducts = (products: any): Product[] => {
 export async function createCart(): Promise<Cart> {
   console.log('createCart');
   const endpoint =
-    SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
+    SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.PUT);
   return mapCart(response);
 }
@@ -240,7 +303,7 @@ export async function addToCart(
 ): Promise<Cart> {
   console.log('addToCart');
   const endpoint =
-    SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
+    SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
   const requestBody = {
     productId: lines.productId,
     quantity: lines.quantity,
@@ -253,7 +316,7 @@ export async function addToCart(
 export async function removeFromCart(cartId: string, cartItemId: string): Promise<void> {
   console.log('removeFromCart');
   const endpoint =
-    SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL + "/" + cartItemId;
+    SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL + "/" + cartItemId;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.DELETE);
 }
 
@@ -263,7 +326,7 @@ export async function updateCart(
 ): Promise<Cart> {
   console.log('updateCart');
   const endpoint =
-    SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL + "/" + cartItemId;
+    SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL + "/" + cartItemId;
   const requestBody = {
     quantity: quantity
   };
@@ -271,13 +334,10 @@ export async function updateCart(
   return mapCart(response);
 }
 
-export async function getCart(cartId: string | undefined): Promise<Cart | undefined> {
+export async function getCart(cartId: string): Promise<Cart | undefined> {
   console.log('getCart');
-  if (!cartId) {
-    return;
-  }
   const endpoint =
-    SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
+    SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
 
   // Old carts becomes `null` when you checkout.
@@ -308,10 +368,10 @@ function mapCart(response: any): Cart {
   return cart;
 }
 
-export async function getCartItems(cartId: string | undefined): Promise<CartItem[]> {
+export async function getCartItems(cartId: string): Promise<CartItem[]> {
   console.log('getCartItems');
   const endpoint =
-    SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
+    SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
   let cartItems = [];
   if (response && response.cartItems) {
@@ -366,7 +426,7 @@ export async function getCollectionProducts({
   reverse?: boolean;
   sortKey?: string;
 }): Promise<Product[]> {
-  console.log('getCollectionProducts', collection);
+  console.log('getCollectionProducts');
   if (collection === 'hidden-homepage-featured-items' || collection === 'hidden-homepage-carousel') {
     const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
     const sortedCategories = categoriesHavingProducts.sort((a, b) =>
@@ -426,7 +486,7 @@ export async function getAllCategoriesHavingProducts(): Promise<Category[]> {
   const categories = await getAllCategoryDetails();
   const categoriesHavingProducts: Category[] = [];
   for (const cetagory of categories) {
-    if (cetagory.numberOfProducts != null &&  cetagory.numberOfProducts > 0) {
+    if (cetagory.numberOfProducts != null && cetagory.numberOfProducts > 0) {
       categoriesHavingProducts.push(cetagory);
     }
   }
@@ -437,7 +497,7 @@ async function fetchParentCategories(): Promise<Category[]> {
   let results: Category[] = [];
   try {
     const endpoint =
-      SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_PARENT_CATEGORIES_ENDPOINT;
+      SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_PARENT_CATEGORIES_ENDPOINT;
 
     const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
     results = extractParentCategories(response);
@@ -467,7 +527,7 @@ async function fetchChildCategories(parentCategories: Category[]): Promise<Categ
   for (const parent of parentCategories) {
     try {
       const endpoint =
-        SFDC_COMMERCE_WEBSTORE_URL +
+        SFDC_COMMERCE_WEBSTORE_API_URL +
         '/' +
         SFDC_COMMERCE_WEBSTORE_ID +
         SFDC_STORE_CHILD_CATEGORIES_ENDPOINT +
@@ -508,7 +568,7 @@ async function fetchCategoryProducts(categories: Category[]): Promise<Product[]>
   try {
     for (const cetagory of categories) {
       const endpoint =
-        SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_CATEGORY_PRODUCTS_SEARCH_ENDPOINT + cetagory.categoryId;
+        SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_CATEGORY_PRODUCTS_SEARCH_ENDPOINT + cetagory.categoryId;
       const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
       const categoryProducts: Product[] = mapCategoryProductsToProduct(response);
       results = results.concat(categoryProducts);
@@ -547,7 +607,7 @@ async function fetchProductsPricing(products: Product[]): Promise<Product[]> {
 
 async function fetchProductPricingDetails(productId: string): Promise<PricingApiResponse> {
   try {
-    const endpoint = `${SFDC_COMMERCE_WEBSTORE_URL}/${SFDC_COMMERCE_WEBSTORE_ID}${SFDC_STORE_PRODUCTS_PRICING_ENDPOINT}${productId}`;
+    const endpoint = `${SFDC_COMMERCE_WEBSTORE_API_URL}/${SFDC_COMMERCE_WEBSTORE_ID}${SFDC_STORE_PRODUCTS_PRICING_ENDPOINT}${productId}`;
     const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
     if (!response?.success || !response.pricingLineItemResults?.length) {
       throw new Error("Invalid response or no pricing data available");
@@ -589,7 +649,7 @@ async function fetchProductDetails(productId: string): Promise<any> {
   let productDetails;
   try {
     const endpoint =
-      SFDC_COMMERCE_WEBSTORE_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_PRODUCT_DETAILS_ENDPOINT + '/' + productId;
+      SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_PRODUCT_DETAILS_ENDPOINT + '/' + productId;
 
     const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
     productDetails = extractProductDetails(response);
@@ -744,6 +804,19 @@ export async function getProducts({
   });
 
   return reshapeProducts(removeEdgesAndNodes(res.body.data.products));
+}
+
+export async function fetchSessionContextDetails(): Promise<boolean> {
+  let isGuestUser = null;
+  try {
+    const endpoint =
+      SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SESSION_CONTEXT_URL;
+    const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
+    isGuestUser = response.guestUser
+  } catch (error) {
+    console.error(`Error fetching session context details :`, error);
+  }
+  return isGuestUser;
 }
 
 // This is called from `app/api/revalidate.ts` so providers can control revalidation logic.

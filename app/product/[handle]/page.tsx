@@ -11,7 +11,6 @@ import { getProduct, getProductRecommendations } from 'lib/sfdc';
 import { Image } from 'lib/sfdc/types';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { getSfdcAuthToken } from 'app/api/auth/authUtil';
 
 export async function generateMetadata(props: {
   params: Promise<{ handle: string }>;
@@ -52,10 +51,6 @@ export async function generateMetadata(props: {
 
 export default async function ProductPage(props: { params: Promise<{ handle: string }> }) {
   console.log('ProductPage');
-  const authToken = await getSfdcAuthToken()
-  if (!authToken) {
-    return null;
-  }
 
   const params = await props.params;
   const product = await getProduct(params.handle);

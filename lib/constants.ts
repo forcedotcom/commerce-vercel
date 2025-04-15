@@ -29,25 +29,69 @@ export const TAGS = {
 export const HIDDEN_PRODUCT_TAG = 'nextjs-frontend-hidden';
 export const DEFAULT_OPTION = 'Default Title';
 
-// SFDC Auth Token Key
-export const SFDC_AUTH_TOKEN_KEY = "sfdc_auth_token";
-
-// SFDC Domain URL (for ex: https://alpinecommerce32.my.salesforce.com)
-const SFDC_DOMAIN_URL = process.env.SFDC_DOMAIN_URL;
+/**
+ * Env Vraibales
+ */
+// Commerce Webstore Site Url (https://abcd.my.site.com/abcd)
+export const SFDC_COMMERCE_WEBSTORE_SITE_URL = process.env.SFDC_COMMERCE_WEBSTORE_SITE_URL;
 
 // SFDC App Version (for ex: v64.0)
-const SFDC_COMMERCE_API_VERSION = process.env.SFDC_COMMERCE_API_VERSION;
+export const SFDC_COMMERCE_API_VERSION = process.env.SFDC_COMMERCE_API_VERSION;
 
+// Webstore Name
+export const SFDC_COMMERCE_WEBSTORE_NAME = process.env.SFDC_COMMERCE_WEBSTORE_NAME;
+
+// Webstore Id
+export const SFDC_COMMERCE_WEBSTORE_ID = process.env.SFDC_COMMERCE_WEBSTORE_ID;
+
+// Site Id
+export const SFDC_COMMERCE_WEBSTORE_SITE_ID = process.env.SFDC_COMMERCE_WEBSTORE_SITE_ID;
+
+// Connected App Consumer Key (Clinet Id)
+export const SALESFORCE_CONSUMER_KEY = process.env.SALESFORCE_CONSUMER_KEY;
+
+// Connected App Consumer Secret (Clinet Secret)
+export const SALESFORCE_CONSUMER_SECRET = process.env.SALESFORCE_CONSUMER_SECRET;
+
+/**
+ * Constant Vraibales
+ */
+
+// SFDC Auth Token Key
+export const SFDC_AUTH_TOKEN_COOKIE_NAME = "sid";
+
+// Guest UUID Essential Cookie Name
+export const SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME = `guest_uuid_essential_${SFDC_COMMERCE_WEBSTORE_SITE_ID}`;
+
+// Guest Cart Session Id Cookie Name
+export const SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME = `GuestCartSessionId_${SFDC_COMMERCE_WEBSTORE_ID}`;
+
+export const IS_GUEST_USER_COOKIE_NAME = 'isGuestUser';
+
+export const GUEST_COOKIE_AGE = 365 * 24 * 60 * 60; /* one year */
+
+// CSRF Token
+export const CSRF_TOKEN_COOKIE_NAME = 'csrf-token';
+
+export const CART_ID_COOKIE_NAME = 'cartId';
+
+/**
+ * URLs
+ */
 // Auth URLs
-export const SALESFORCE_AUTH_URL = SFDC_DOMAIN_URL + "/services/oauth2/authorize";
-export const SALESFORCE_TOKEN_URL= SFDC_DOMAIN_URL + "/services/oauth2/token";
-export const  SALESFORCE_USERINFO_URL = SFDC_DOMAIN_URL + "s/ervices/oauth2/userinfo";
+export const SALESFORCE_LOGIN_URL = "https://login.salesforce.com/services/oauth2/token";
 
-// SFDC Public API URL
-export const SFDC_SERVICES_ENDPOINT = '/services/data/' + SFDC_COMMERCE_API_VERSION;
+// SFDC Webruntime API URL (https://abcd.my.site.com/abcd/webruntime/api)
+export const SFDC_SITE_WEBRUNTIME_URL = SFDC_COMMERCE_WEBSTORE_SITE_URL + '/webruntime';
+
+// SFDC Webruntime API URL (https://abcd.my.site.com/abcd/webruntime/api)
+export const SFDC_SITE_WEBRUNTIME_API_URL = SFDC_SITE_WEBRUNTIME_URL + '/api';
+
+// SFDC Webruntime API URL (https://abcd.my.site.com/abcd/webruntime/api/services/data/v63.0)
+const SFDC_SITE_SERVICE_DATA_API_URL = SFDC_SITE_WEBRUNTIME_API_URL + '/services/data/' + SFDC_COMMERCE_API_VERSION;
 
 // SFDC Commerce Webstore URL
-export const SFDC_COMMERCE_WEBSTORE_URL = SFDC_DOMAIN_URL + SFDC_SERVICES_ENDPOINT + "/commerce/webstores";
+export const SFDC_COMMERCE_WEBSTORE_API_URL = SFDC_SITE_SERVICE_DATA_API_URL + "/commerce/webstores";
 
 // SFDC Categories URLs
 export const SFDC_STORE_PARENT_CATEGORIES_ENDPOINT = "/product-categories/children";
@@ -62,3 +106,12 @@ export const SFDC_STORE_PRODUCT_DETAILS_ENDPOINT = "/products";
 export const CARTS_URL = "/carts";
 export const CARTS_CURRENT_URL = CARTS_URL + "/current";
 export const CARTS_CURRENT_ITEMS_URL = CARTS_CURRENT_URL + "/cart-items";
+
+// Session Context URL
+export const SESSION_CONTEXT_URL = "/session-context";
+
+// Apex Execute URL
+export const APEX_EXECUTE = '/apex/execute';
+
+// CSRF Token URL
+export const CSRF_TOKEN_URL = '/module/@app/csrfToken';
