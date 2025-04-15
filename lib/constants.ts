@@ -78,8 +78,6 @@ export const CART_ID_COOKIE_NAME = 'cartId';
 /**
  * URLs
  */
-// Auth URLs
-export const SALESFORCE_LOGIN_URL = "https://login.salesforce.com/services/oauth2/token";
 
 // SFDC Webruntime API URL (https://abcd.my.site.com/abcd/webruntime/api)
 export const SFDC_SITE_WEBRUNTIME_URL = SFDC_COMMERCE_WEBSTORE_SITE_URL + '/webruntime';
@@ -94,13 +92,13 @@ const SFDC_SITE_SERVICE_DATA_API_URL = SFDC_SITE_WEBRUNTIME_API_URL + '/services
 export const SFDC_COMMERCE_WEBSTORE_API_URL = SFDC_SITE_SERVICE_DATA_API_URL + "/commerce/webstores";
 
 // SFDC Categories URLs
-export const SFDC_STORE_PARENT_CATEGORIES_ENDPOINT = "/product-categories/children";
-export const SFDC_STORE_CHILD_CATEGORIES_ENDPOINT = "/product-categories/children?parentProductCategoryId=";
-export const SFDC_STORE_CATEGORY_PRODUCTS_SEARCH_ENDPOINT = "/search/products?categoryId=";
+export const PARENT_CATEGORIES_URL = "/product-categories/children";
+export const CHILD_CATEGORIES_URL = "/product-categories/children?parentProductCategoryId=";
+export const CATEGORY_PRODUCTS_SEARCH_URL = "/search/products?categoryId=";
 
 // SFDC Products URLs
-export const SFDC_STORE_PRODUCTS_PRICING_ENDPOINT = "/pricing/products?productIds=";
-export const SFDC_STORE_PRODUCT_DETAILS_ENDPOINT = "/products";
+export const PRODUCTS_PRICING_URL = "/pricing/products?productIds=";
+export const PRODUCT_DETAILS_URL = "/products";
 
 // SFDC Cart URLs
 export const CARTS_URL = "/carts";
