@@ -62,13 +62,6 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
       credentials: 'include',
     };
 
-    // Apply cache: 'force-cache' only when it's a GET request and the endpoint is cacheable
-    const isGetRequest = httpMethod === 'GET';
-    const isCacheableEndpoint = endpoint.match(/product-categories|search|pricing|products/);
-    if (isGetRequest && isCacheableEndpoint) {
-      fetchOptions.cache = 'force-cache';
-    }
-
     const response = await fetch(endpoint, fetchOptions);
 
     if (!response.ok) {
