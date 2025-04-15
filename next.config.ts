@@ -8,6 +8,6 @@
 //         pathname: '/s/files/**'
 //       }
 //     ],
-//     domains: ['s3.amazonaws.com', 'cdn.autostacker.com', 'cdn.jackpak.com'],
+//     domains: ['s3.amazonaws.com',],
 //   }
 // };
