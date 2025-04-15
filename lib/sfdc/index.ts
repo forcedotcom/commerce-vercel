@@ -1,12 +1,11 @@
 import {
-  HIDDEN_PRODUCT_TAG,
   CARTS_CURRENT_URL,
   CARTS_CURRENT_ITEMS_URL,
-  SFDC_STORE_CATEGORY_PRODUCTS_SEARCH_ENDPOINT,
-  SFDC_STORE_CHILD_CATEGORIES_ENDPOINT,
-  SFDC_STORE_PARENT_CATEGORIES_ENDPOINT,
-  SFDC_STORE_PRODUCT_DETAILS_ENDPOINT,
-  SFDC_STORE_PRODUCTS_PRICING_ENDPOINT,
+  CATEGORY_PRODUCTS_SEARCH_URL,
+  CHILD_CATEGORIES_URL,
+  PARENT_CATEGORIES_URL,
+  PRODUCT_DETAILS_URL,
+  PRODUCTS_PRICING_URL,
   TAGS,
   SFDC_COMMERCE_WEBSTORE_API_URL,
   SFDC_AUTH_TOKEN_COOKIE_NAME,
@@ -16,27 +15,15 @@ import {
   SESSION_CONTEXT_URL,
   CSRF_TOKEN_COOKIE_NAME,
 } from 'lib/constants';
-import { isShopifyError } from 'lib/type-guards';
 import { revalidateTag } from 'next/cache';
 import { cookies, headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { getPageQuery, getPagesQuery } from './queries/page';
-import {
-  getProductsQuery
-} from './queries/product';
 import {
   Cart,
   Collection,
-  Connection,
-  Image,
   Menu,
   Page,
   Product,
-  ShopifyCollection,
-  ShopifyPageOperation,
-  ShopifyPagesOperation,
-  ShopifyProduct,
-  ShopifyProductsOperation,
   Category,
   ProductOption,
   PricingApiResponse,
@@ -52,60 +39,6 @@ export enum HttpMethod {
   DELETE = 'DELETE'
 }
 
-type ExtractVariables<T> = T extends { variables: object } ? T['variables'] : never;
-
-export async function shopifyFetch<T>({
-  cache = 'force-cache',
-  headers,
-  query,
-  tags,
-  variables
-}: {
-  cache?: RequestCache;
-  headers?: HeadersInit;
-  query: string;
-  tags?: string[];
-  variables?: ExtractVariables<T>;
-}): Promise<{ status: number; body: T } | never> {
-  try {
-    const result = await fetch(SFDC_COMMERCE_WEBSTORE_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + SFDC_AUTH_TOKEN_COOKIE_NAME,
-        ...headers
-      },
-      body: JSON.stringify(query),
-      cache,
-      ...(tags && { next: { tags } })
-    });
-
-    const body = await result.json();
-
-    if (body.errors) {
-      throw body.errors[0];
-    }
-
-    return {
-      status: result.status,
-      body
-    };
-  } catch (e) {
-    if (isShopifyError(e)) {
-      throw {
-        cause: e.cause?.toString() || 'unknown',
-        status: e.status || 500,
-        message: e.message,
-        query
-      };
-    }
-
-    throw {
-      error: e,
-      query
-    };
-  }
-}
 
 async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: object, req?: NextRequest): Promise<any> {
   try {
@@ -116,58 +49,27 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
         ? JSON.parse(isGuestUserHeader)
         : await getIsGuestUserFromCookie();
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    // Authenticated User
-    if (!isGuestUser) {
-      const cookies = [];
-      const authToken = await getSfdcAuthToken();
-      if (authToken) {
-        cookies.push(`${SFDC_AUTH_TOKEN_COOKIE_NAME}=${authToken}`);
-      }
-      if (cookies.length) {
-        headers['Cookie'] = cookies.join('; ');
-      }
-      const csrfToken = await getCsrfTokenFromCookie();
-      if (csrfToken && endpoint.match('cart-items') && (httpMethod === HttpMethod.POST || httpMethod === HttpMethod.PATCH || httpMethod === HttpMethod.DELETE)) {
-        headers[CSRF_TOKEN_COOKIE_NAME] = csrfToken;
-      }
-    }
-
-    // Guest User
-    if (isGuestUser) {
-      const cookies = [];
-
-      // add cart cookies in request headres
-      if (endpoint.match('carts')) {
-        const guestUuid =
-          req?.headers.get('x-guest-uuid') ??
-          (await getGuestEssentialUuidFromCookie());
-        if (guestUuid) {
-          cookies.push(`${SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME}=${guestUuid}`);
-        }
-        const guestCartSessionUuid = await getGuestCartSessionUuid(req);
-        if (guestCartSessionUuid) {
-          cookies.push(`${SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME}=${guestCartSessionUuid}`);
-        }
-      }
-      if (cookies.length) {
-        headers['Cookie'] = cookies.join('; ');
-      }
-    }
-
+    const headers = await setApiheaders(isGuestUser, httpMethod, endpoint, req);
     endpoint += endpoint.includes('?')
       ? `&isGuest=${isGuestUser ? 'true' : 'false'}`
       : `?isGuest=${isGuestUser ? 'true' : 'false'}`;
 
-    const response = await fetch(endpoint, {
+
+    const fetchOptions: RequestInit = {
       method: httpMethod,
       headers,
       body: body ? JSON.stringify(body) : null,
-      credentials: 'include'
-    });
+      credentials: 'include',
+    };
+
+    // Apply cache: 'force-cache' only when it's a GET request and the endpoint is cacheable
+    const isGetRequest = httpMethod === 'GET';
+    const isCacheableEndpoint = endpoint.match(/product-categories|search|pricing|products/);
+    if (isGetRequest && isCacheableEndpoint) {
+      fetchOptions.cache = 'force-cache';
+    }
+
+    const response = await fetch(endpoint, fetchOptions);
 
     if (!response.ok) {
       console.error('HTTP error! ', response);
@@ -184,13 +86,58 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
   }
 }
 
+async function setApiheaders(isGuestUser: boolean, httpMethod: HttpMethod, endpoint: string, req?: NextRequest) {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Authenticated User
+  if (!isGuestUser) {
+    const cookies = [];
+    const authToken = await getSfdcAuthToken();
+    if (authToken) {
+      cookies.push(`${SFDC_AUTH_TOKEN_COOKIE_NAME}=${authToken}`);
+    }
+    if (cookies.length) {
+      headers['Cookie'] = cookies.join('; ');
+    }
+    const csrfToken = await getCsrfTokenFromCookie();
+    if (csrfToken && endpoint.match('cart-items') && (httpMethod === HttpMethod.POST || httpMethod === HttpMethod.PATCH || httpMethod === HttpMethod.DELETE)) {
+      headers[CSRF_TOKEN_COOKIE_NAME] = csrfToken;
+    }
+  }
+
+  // Guest User
+  if (isGuestUser) {
+    const cookies = [];
+
+    // add cart cookies in request headres
+    if (endpoint.match('carts')) {
+      const guestUuid =
+        req?.headers.get('x-guest-uuid') ??
+        (await getGuestEssentialUuidFromCookie());
+      if (guestUuid) {
+        cookies.push(`${SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME}=${guestUuid}`);
+      }
+      const guestCartSessionUuid = await getGuestCartSessionUuid(req);
+      if (guestCartSessionUuid) {
+        cookies.push(`${SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME}=${guestCartSessionUuid}`);
+      }
+    }
+    if (cookies.length) {
+      headers['Cookie'] = cookies.join('; ');
+    }
+  }
+  return headers;
+}
+
 async function extractGuestCartSessionIdFromResponseHeaders(response: any) {
   const setCookieHeaders = response.headers?.get('set-cookie') || '';
   let guestCartSessionId = '';
   if (typeof window === 'undefined' && setCookieHeaders) {
     const match = setCookieHeaders.match(new RegExp(`GuestCartSessionId_${SFDC_COMMERCE_WEBSTORE_ID}=([^;]+)`));
     if (match) {
-      guestCartSessionId = match[1] ? match[1] : ''; // Extract only the session ID (xxxxx)
+      guestCartSessionId = match[1] ? match[1] : '';
       (await cookies()).set({
         name: SFDC_GUEST_CART_SESSION_ID_COOKIE_NAME,
         value: guestCartSessionId,
@@ -202,93 +149,6 @@ async function extractGuestCartSessionIdFromResponseHeaders(response: any) {
   }
 }
 
-const removeEdgesAndNodes = <T>(array: Connection<T>): T[] => {
-  return array.edges.map((edge) => edge?.node);
-};
-
-const reshapeCollection = (collection: ShopifyCollection): Collection | undefined => {
-  if (!collection) {
-    return undefined;
-  }
-
-  return {
-    ...collection,
-    path: `/search/${collection.handle}`
-  };
-};
-
-const reshapeCollections = (collections: ShopifyCollection[]) => {
-  const reshapedCollections = [];
-
-  for (const collection of collections) {
-    if (collection) {
-      const reshapedCollection = reshapeCollection(collection);
-
-      if (reshapedCollection) {
-        reshapedCollections.push(reshapedCollection);
-      }
-    }
-  }
-
-  return reshapedCollections;
-};
-
-const reshapeImages = (images: Connection<Image>, productTitle: string) => {
-  const flattened = removeEdgesAndNodes(images);
-
-  return flattened.map((image) => {
-    const filename = image.url.match(/.*\/(.*)\..*/)?.[1];
-    return {
-      ...image,
-      altText: image.altText || `${productTitle} - ${filename}`
-    };
-  });
-};
-
-const reshapeProduct = (product: ShopifyProduct, filterHiddenProducts: boolean = true) => {
-  if (!product || (filterHiddenProducts && product.tags.includes(HIDDEN_PRODUCT_TAG))) {
-    return undefined;
-  }
-
-  const { images, variants, ...rest } = product;
-
-  return {
-    ...rest,
-    images: reshapeImages(images, product.title),
-    variants: removeEdgesAndNodes(variants)
-  };
-};
-
-const reshapeProducts = (products: ShopifyProduct[]) => {
-  const reshapedProducts = [];
-
-  for (const product of products) {
-    if (product) {
-      const reshapedProduct = reshapeProduct(product);
-
-      if (reshapedProduct) {
-        reshapedProducts.push(reshapedProduct);
-      }
-    }
-  }
-
-  return reshapedProducts;
-};
-
-const mapProducts = (products: any): Product[] => {
-  const allProducts: any[] = [];
-  for (const product of products) {
-    if (product) {
-      allProducts.push({
-        id: product.productId,
-        title: product.productName,
-        description: product.productName
-      });
-    }
-  }
-  return allProducts;
-};
-
 export async function createCart(): Promise<Cart> {
   console.log('createCart');
   const endpoint =
@@ -298,7 +158,7 @@ export async function createCart(): Promise<Cart> {
 }
 
 export async function addToCart(
-  cartId: string,
+  cartId: string | null,
   lines: { productId: string; quantity: number, type: string }
 ): Promise<Cart> {
   console.log('addToCart');
@@ -334,8 +194,8 @@ export async function updateCart(
   return mapCart(response);
 }
 
-export async function getCart(cartId: string): Promise<Cart | undefined> {
-  console.log('getCart');
+export async function getCart(cartId: string | null): Promise<Cart | undefined> {
+  console.log('getCart API');
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
@@ -353,23 +213,22 @@ export async function getCart(cartId: string): Promise<Cart | undefined> {
 }
 
 function mapCart(response: any): Cart {
-  // Map API response to `Cart` type
   const cart: Cart = {
-    id: response.cartId, // Mapping `cartId` -> `id`
-    checkoutUrl: "", // No checkout URL provided in response
+    id: response.cartId,
+    checkoutUrl: "",
     cost: {
-      subtotalAmount: { amount: "0", currencyCode: response.currencyIsoCode }, // No direct mapping, setting 0 as default
-      totalAmount: { amount: response.grandTotalAmount, currencyCode: response.currencyIsoCode }, // `grandTotalAmount` -> `totalAmount`
-      totalTaxAmount: { amount: response.totalTaxAmount, currencyCode: response.currencyIsoCode }, // `totalTaxAmount` -> `totalTaxAmount`
+      subtotalAmount: { amount: "0", currencyCode: response.currencyIsoCode },
+      totalAmount: { amount: response.grandTotalAmount, currencyCode: response.currencyIsoCode },
+      totalTaxAmount: { amount: response.totalTaxAmount, currencyCode: response.currencyIsoCode },
     },
-    lines: [], // No direct mapping for `CartItem`s, handling separately below
-    totalQuantity: Number(response.totalProductCount) || 0, // `totalProductCount` -> `totalQuantity`
+    lines: [],
+    totalQuantity: Number(response.totalProductCount) || 0
   };
   return cart;
 }
 
 export async function getCartItems(cartId: string): Promise<CartItem[]> {
-  console.log('getCartItems');
+  console.log('getCartItems API');
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
@@ -426,8 +285,10 @@ export async function getCollectionProducts({
   reverse?: boolean;
   sortKey?: string;
 }): Promise<Product[]> {
-  console.log('getCollectionProducts');
+  // console.log('getCollectionProducts API');
+  console.log('getCollectionProducts API start', new Date());
   if (collection === 'hidden-homepage-featured-items' || collection === 'hidden-homepage-carousel') {
+    // get products for home page
     const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
     const sortedCategories = categoriesHavingProducts.sort((a, b) =>
       a.categoryName.localeCompare(b.categoryName)
@@ -437,8 +298,10 @@ export async function getCollectionProducts({
     // get products from all categories
     let allProducts = await fetchCategoryProducts(limitedCategories);
     allProducts = await fetchProductsPricing(allProducts);
+    console.log('getCollectionProducts API end', new Date());
     return allProducts;
   } else {
+    // get products from selected category (collection)
     const categories: Category[] = [
       {
         categoryId: collection,
@@ -447,6 +310,7 @@ export async function getCollectionProducts({
     ]
     let categoryProducts = await fetchCategoryProducts(categories)
     categoryProducts = await fetchProductsPricing(categoryProducts);
+    console.log('getCollectionProducts API end', new Date());
     return categoryProducts;
   }
 }
@@ -483,6 +347,7 @@ export async function getAllCategoryDetails() {
 }
 
 export async function getAllCategoriesHavingProducts(): Promise<Category[]> {
+  console.log('getAllCategoriesHavingProducts API');
   const categories = await getAllCategoryDetails();
   const categoriesHavingProducts: Category[] = [];
   for (const cetagory of categories) {
@@ -497,7 +362,7 @@ async function fetchParentCategories(): Promise<Category[]> {
   let results: Category[] = [];
   try {
     const endpoint =
-      SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_PARENT_CATEGORIES_ENDPOINT;
+      SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + PARENT_CATEGORIES_URL;
 
     const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
     results = extractParentCategories(response);
@@ -523,23 +388,25 @@ function extractParentCategories(response: any): Category[] {
 }
 
 async function fetchChildCategories(parentCategories: Category[]): Promise<Category[]> {
-  let results: Category[] = [];
-  for (const parent of parentCategories) {
+  const fetchPromises = parentCategories.map(async (parent) => {
     try {
       const endpoint =
         SFDC_COMMERCE_WEBSTORE_API_URL +
         '/' +
         SFDC_COMMERCE_WEBSTORE_ID +
-        SFDC_STORE_CHILD_CATEGORIES_ENDPOINT +
+        CHILD_CATEGORIES_URL +
         parent.categoryId;
+
       const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
-      const childCategories = extractChildCategories(response, parent.categoryId, parent.categoryName);
-      results = results.concat(childCategories);
+      return extractChildCategories(response, parent.categoryId, parent.categoryName);
     } catch (error) {
       console.error(`Error fetching child categories from parent category ${parent.categoryId}:`, error);
+      return []; // Gracefully skip this parent
     }
-  }
-  return results;
+  });
+
+  const results = await Promise.all(fetchPromises);
+  return results.flat(); // Flatten nested arrays into a single Category[]
 }
 
 function extractChildCategories(
@@ -564,19 +431,25 @@ function extractChildCategories(
 }
 
 async function fetchCategoryProducts(categories: Category[]): Promise<Product[]> {
-  let results: Product[] = [];
-  try {
-    for (const cetagory of categories) {
+  const fetchPromises = categories.map(async (category) => {
+    try {
       const endpoint =
-        SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_CATEGORY_PRODUCTS_SEARCH_ENDPOINT + cetagory.categoryId;
+        SFDC_COMMERCE_WEBSTORE_API_URL +
+        '/' +
+        SFDC_COMMERCE_WEBSTORE_ID +
+        CATEGORY_PRODUCTS_SEARCH_URL +
+        category.categoryId;
+
       const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
-      const categoryProducts: Product[] = mapCategoryProductsToProduct(response);
-      results = results.concat(categoryProducts);
+      return mapCategoryProductsToProduct(response);
+    } catch (error) {
+      console.error(`Error fetching products for category ${category.categoryId}:`, error);
+      return []; // Skip on error
     }
-  } catch (error) {
-    console.error(`Error fetching store category products :`, error);
-  }
-  return results;
+  });
+
+  const results = await Promise.all(fetchPromises);
+  return results.flat(); // Flatten array of arrays
 }
 
 function mapCategoryProductsToProduct(apiResponse: any): Product[] {
@@ -593,21 +466,23 @@ function mapCategoryProductsToProduct(apiResponse: any): Product[] {
 }
 
 async function fetchProductsPricing(products: Product[]): Promise<Product[]> {
-  try {
-    for (let product of products) {
+  const pricingPromises = products.map(async (product) => {
+    try {
       const pricingApiResponse = await fetchProductPricingDetails(product.id);
-      product = mapPricingToProduct(product, pricingApiResponse);
+      return mapPricingToProduct(product, pricingApiResponse);
+    } catch (error) {
+      console.error(`Skipping pricing for product ${product.id} due to error.`);
+      return product; // return product as-is if pricing fails
     }
-  } catch (error) {
-    console.error(`Error fetching store category products :`, error);
-    throw error;
-  }
-  return products;
+  });
+
+  const updatedProducts = await Promise.all(pricingPromises);
+  return updatedProducts;
 }
 
 async function fetchProductPricingDetails(productId: string): Promise<PricingApiResponse> {
   try {
-    const endpoint = `${SFDC_COMMERCE_WEBSTORE_API_URL}/${SFDC_COMMERCE_WEBSTORE_ID}${SFDC_STORE_PRODUCTS_PRICING_ENDPOINT}${productId}`;
+    const endpoint = `${SFDC_COMMERCE_WEBSTORE_API_URL}/${SFDC_COMMERCE_WEBSTORE_ID}${PRODUCTS_PRICING_URL}${productId}`;
     const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
     if (!response?.success || !response.pricingLineItemResults?.length) {
       throw new Error("Invalid response or no pricing data available");
@@ -646,23 +521,37 @@ export async function getProduct(handle: string): Promise<Product | undefined> {
 }
 
 async function fetchProductDetails(productId: string): Promise<any> {
-  let productDetails;
   try {
-    const endpoint =
-      SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + SFDC_STORE_PRODUCT_DETAILS_ENDPOINT + '/' + productId;
+    const productDetailsPromise = (async () => {
+      const endpoint =
+        SFDC_COMMERCE_WEBSTORE_API_URL + '/' +
+        SFDC_COMMERCE_WEBSTORE_ID +
+        PRODUCT_DETAILS_URL + '/' +
+        productId;
 
-    const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
-    productDetails = extractProductDetails(response);
+      const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
+      return { rawResponse: response, details: extractProductDetails(response) };
+    })();
 
-    const pricingApiResponse: PricingApiResponse = await fetchProductPricingDetails(productId);
-    productDetails = mapPricingToProduct(productDetails, pricingApiResponse);
+    const pricingPromise = fetchProductPricingDetails(productId);
 
-    productDetails.variants = extractProductVariants(response, pricingApiResponse);
+    // Run both in parallel
+    const [{ rawResponse, details }, pricingApiResponse] = await Promise.all([
+      productDetailsPromise,
+      pricingPromise,
+    ]);
+
+    const productWithPricing = mapPricingToProduct(details, pricingApiResponse);
+    productWithPricing.variants = extractProductVariants(rawResponse, pricingApiResponse);
+
+    return productWithPricing;
+
   } catch (error) {
-    console.error(`Error fetching store category products :`, error);
+    console.error(`Error fetching product details for ${productId}:`, error);
+    return undefined;
   }
-  return productDetails;
 }
+
 
 function extractProductDetails(apiResponse: any): any {
   return {
@@ -733,7 +622,7 @@ export async function getCollections(): Promise<Collection[]> {
 }
 
 export async function getMenu(handle: string): Promise<Menu[]> {
-  console.log('getMenu', handle);
+  console.log('getMenu API', handle);
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
   const sortedCategories = categoriesHavingProducts.sort((a, b) =>
     a.categoryName.localeCompare(b.categoryName)
@@ -748,38 +637,18 @@ export async function getMenu(handle: string): Promise<Menu[]> {
   return categoryAsMenueItems;
 }
 
-export async function getPage(handle: string): Promise<Page> {
+export async function getPage(handle: string): Promise<Page | undefined> {
   console.log('getPage');
-  const res = await shopifyFetch<ShopifyPageOperation>({
-    query: getPageQuery,
-    cache: 'no-store',
-    variables: { handle }
-  });
-
-  return res.body.data.pageByHandle;
+  return undefined;
 }
 
 export async function getPages(): Promise<Page[]> {
   console.log('getPages');
-  const res = await shopifyFetch<ShopifyPagesOperation>({
-    query: getPagesQuery,
-    cache: 'no-store'
-  });
-
-  return removeEdgesAndNodes(res.body.data.pages);
+  return [];
 }
 
 export async function getProductRecommendations(productId: string): Promise<Product[]> {
   console.log('getProductRecommendations');
-  // const res = await shopifyFetch<ShopifyProductRecommendationsOperation>({
-  //   query: getProductRecommendationsQuery,
-  //   tags: [TAGS.products],
-  //   variables: {
-  //     productId
-  //   }
-  // });
-
-  // return reshapeProducts(res.body.data.productRecommendations);
   return [];
 }
 
@@ -793,20 +662,11 @@ export async function getProducts({
   sortKey?: string;
 }): Promise<Product[]> {
   console.log('getProducts');
-  const res = await shopifyFetch<ShopifyProductsOperation>({
-    query: getProductsQuery,
-    tags: [TAGS.products],
-    variables: {
-      query,
-      reverse,
-      sortKey
-    }
-  });
-
-  return reshapeProducts(removeEdgesAndNodes(res.body.data.products));
+  return [];
 }
 
 export async function fetchSessionContextDetails(): Promise<boolean> {
+  console.log('fetchSessionContextDetails API');
   let isGuestUser = null;
   try {
     const endpoint =
