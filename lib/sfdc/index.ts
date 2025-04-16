@@ -163,6 +163,10 @@ export async function addToCart(
     type: lines.type,
   };
   const response = await makeSfdcApiCall(endpoint, HttpMethod.POST, requestBody);
+  
+  // Add a 2-second delay
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
   return mapCart(response);
 }
 
