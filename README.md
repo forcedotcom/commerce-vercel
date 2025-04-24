@@ -41,28 +41,28 @@ You will need to use the environment variables [defined in `.env.example`](.env.
 2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
 3. Download your environment variables: `vercel env pull`
 
-```bash
-pnpm install
-pnpm dev
-```
+    ```bash
+    pnpm install
+    pnpm dev
+    ```
 
-Sample `.env` file
-```bash
-# API Version
-SFDC_COMMERCE_API_VERSION = v64.0
+    Sample `.env` file
+    ```bash
+    # API Version
+    SFDC_COMMERCE_API_VERSION = v64.0
 
-# 15 digit store id
-SFDC_COMMERCE_WEBSTORE_ID = 0ZE000000000000
+    # 15 digit store id
+    SFDC_COMMERCE_WEBSTORE_ID = 0ZE000000000000
 
-# Store Name
-SFDC_COMMERCE_WEBSTORE_NAME = Commerce Store
+    # Store Name
+    SFDC_COMMERCE_WEBSTORE_NAME = Commerce Store
 
-# 15 digit site id
-SFDC_COMMERCE_WEBSTORE_SITE_ID = 0DMWs000000UvId
+    # 15 digit site id
+    SFDC_COMMERCE_WEBSTORE_SITE_ID = 0DMWs000000UvId
 
-# SFDC Commerce Store Site URL
-SFDC_COMMERCE_WEBSTORE_SITE_URL = https://abcd.my.site.com/abcdstore
-```
+    # SFDC Commerce Store Site URL
+    SFDC_COMMERCE_WEBSTORE_SITE_URL = https://abcd.my.site.com/abcdstore
+    ```
 
 Your app should now be running on [localhost:3000](http://localhost:3000/).
 
