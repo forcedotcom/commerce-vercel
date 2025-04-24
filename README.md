@@ -46,10 +46,26 @@ pnpm install
 pnpm dev
 ```
 
+Sample `.env` file
+```bash
+# API Version
+SFDC_COMMERCE_API_VERSION = v64.0
+
+# 15 digit store id
+SFDC_COMMERCE_WEBSTORE_ID = 0ZE000000000000
+
+# Store Name
+SFDC_COMMERCE_WEBSTORE_NAME = Commerce Store
+
+# 15 digit site id
+SFDC_COMMERCE_WEBSTORE_SITE_ID = 0DMWs000000UvId
+
+# SFDC Commerce Store Site URL
+SFDC_COMMERCE_WEBSTORE_SITE_URL = https://abcd.my.site.com/abcdstore
+```
+
 Your app should now be running on [localhost:3000](http://localhost:3000/).
 
 ## Integration Guide
 
-You can use the comprehensive integration guides for both:
-- [Vercel and Shopify Integration](https://vercel.com/docs/integrations/ecommerce/shopify)
-- [Salesforce Commerce Cloud Integration](https://developer.salesforce.com/docs/commerce/commerce-api/guide/get-started.html)
+[Commerce B2B and D2C Resources](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce.htm)
