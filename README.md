@@ -1,4 +1,4 @@
-# Salesforce Vercel Integration
+# Salesforce Commerce Vercel Integration
 
 A high-performance, server-rendered Next.js App Router ecommerce application integrated with Salesforce Commerce Cloud.
 
