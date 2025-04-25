@@ -12,8 +12,6 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  console.log('HomePage');
-  
   const products: Product[] = await getCollectionProducts({
     collection: 'hidden-homepage-featured-items'
   });

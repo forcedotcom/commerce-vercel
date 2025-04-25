@@ -3,26 +3,24 @@ import { CSRF_TOKEN_COOKIE_NAME, GUEST_COOKIE_AGE, IS_GUEST_USER_COOKIE_NAME, SF
 import { fetchSessionContextDetails } from 'lib/sfdc';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function middleware(req: NextRequest) {
-  console.log('middleware');
+export async function middleware(request: NextRequest) {
   const res = NextResponse.next();
 
-  const guestUuidInCookie = req.cookies.get(SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME)?.value;
-  const authToken = req.cookies.get(SFDC_AUTH_TOKEN_COOKIE_NAME)?.value;
+  const guestUuidInCookie = request.cookies.get(SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME)?.value;
+  const authToken = request.cookies.get(SFDC_AUTH_TOKEN_COOKIE_NAME)?.value;
 
-  let isGuestUserRes = true;
+  let isGuestUserRes = null;
 
   try {
     // Check session context to identify if the user is guest or authenticated
     const sessionInfo = await fetchSessionContextDetails();
-    isGuestUserRes = sessionInfo ?? true;
+    isGuestUserRes = sessionInfo;
   } catch (err) {
     console.error('Error fetching session context:', err);
-    isGuestUserRes = true; // fallback to guest
   }
 
   // Scenario 1: Auth token exists but session is invalid (i.e. user is actually guest)
-  if (authToken && isGuestUserRes) {
+  if (authToken && isGuestUserRes === true) {
     await deleteSfdcAuthToken();
     await deleteCsrfTokenCookie();
 
@@ -30,14 +28,16 @@ export async function middleware(req: NextRequest) {
     res.cookies.delete(CSRF_TOKEN_COOKIE_NAME);
   }
 
-  // Scenario 2: Set isGuestUser cookie based on actual session
-  res.cookies.set(IS_GUEST_USER_COOKIE_NAME, JSON.stringify(isGuestUserRes), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    path: '/',
-  });
-  res.headers.set('x-guest-user', JSON.stringify(isGuestUserRes));
+  // Scenario 2: Set isGuestUser cookie only if we have a definitive response
+  if (isGuestUserRes !== null) {
+    res.cookies.set(IS_GUEST_USER_COOKIE_NAME, JSON.stringify(isGuestUserRes), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/',
+    });
+    res.headers.set('x-guest-user', JSON.stringify(isGuestUserRes));
+  }
 
   // Scenario 3: Generate guest UUID if not present
   if (!guestUuidInCookie) {
@@ -55,11 +55,16 @@ export async function middleware(req: NextRequest) {
   return res;
 }
 
-// Apply middleware to all routes except API routes (optional)
+// Configure middleware to run on specific paths
 export const config = {
   matcher: [
-    '/',
-    '/product/:path*',
-    '/search/:path*',
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };

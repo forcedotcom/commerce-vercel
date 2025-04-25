@@ -58,7 +58,6 @@ function SubmitButton({
 }
 
 export function AddToCart({ product }: { product: Product }) {
-  console.log('AddToCart');
   const { variants, availableForSale } = product;
   const { addCartItem } = useCart();
   const { state } = useProduct();

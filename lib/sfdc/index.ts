@@ -29,7 +29,7 @@ import {
   PricingApiResponse,
   CartItem,
 } from './types';
-import { getCsrfTokenFromCookie, getGuestCartSessionUuid, getGuestEssentialUuidFromCookie, getIsGuestUserFromCookie, getSfdcAuthToken } from 'app/api/auth/authUtil';
+import { getCsrfTokenFromCookie, getGuestCartSessionUuid, getGuestEssentialUuidFromCookie, getIsGuestUserFromCookie, getSfdcAuthToken, setCartIdInCookie } from 'app/api/auth/authUtil';
 
 export enum HttpMethod {
   GET = 'GET',
@@ -143,7 +143,6 @@ async function extractGuestCartSessionIdFromResponseHeaders(response: any) {
 }
 
 export async function createCart(): Promise<Cart> {
-  console.log('createCart');
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.PUT);
@@ -163,7 +162,7 @@ export async function addToCart(
     type: lines.type,
   };
   const response = await makeSfdcApiCall(endpoint, HttpMethod.POST, requestBody);
-  
+
   // Add a 2-second delay
   await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -171,7 +170,6 @@ export async function addToCart(
 }
 
 export async function removeFromCart(cartId: string, cartItemId: string): Promise<void> {
-  console.log('removeFromCart');
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL + "/" + cartItemId;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.DELETE);
@@ -181,7 +179,6 @@ export async function updateCart(
   cartItemId: string,
   quantity: number
 ): Promise<Cart> {
-  console.log('updateCart');
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL + "/" + cartItemId;
   const requestBody = {
@@ -192,7 +189,6 @@ export async function updateCart(
 }
 
 export async function getCart(cartId: string | null): Promise<Cart | undefined> {
-  console.log('getCart API');
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
@@ -211,21 +207,20 @@ export async function getCart(cartId: string | null): Promise<Cart | undefined> 
 
 function mapCart(response: any): Cart {
   const cart: Cart = {
-    id: response.cartId,
+    id: response?.cartId,
     checkoutUrl: "",
     cost: {
-      subtotalAmount: { amount: "0", currencyCode: response.currencyIsoCode },
-      totalAmount: { amount: response.grandTotalAmount, currencyCode: response.currencyIsoCode },
-      totalTaxAmount: { amount: response.totalTaxAmount, currencyCode: response.currencyIsoCode },
+      subtotalAmount: { amount: "0", currencyCode: response?.currencyIsoCode },
+      totalAmount: { amount: response?.grandTotalAmount, currencyCode: response?.currencyIsoCode },
+      totalTaxAmount: { amount: response?.totalTaxAmount, currencyCode: response?.currencyIsoCode },
     },
     lines: [],
-    totalQuantity: Number(response.totalProductCount) || 0
+    totalQuantity: Number(response?.totalProductCount) || 0
   };
   return cart;
 }
 
 export async function getCartItems(cartId: string): Promise<CartItem[]> {
-  console.log('getCartItems API');
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
@@ -269,7 +264,6 @@ function mapCartItem(apiCartItem: any): CartItem {
 }
 
 export async function getCollection(handle: string): Promise<Collection | undefined> {
-  console.log('getCollection');
   return undefined;
 }
 
@@ -282,8 +276,6 @@ export async function getCollectionProducts({
   reverse?: boolean;
   sortKey?: string;
 }): Promise<Product[]> {
-  // console.log('getCollectionProducts API');
-  console.log('getCollectionProducts API start', new Date());
   if (collection === 'hidden-homepage-featured-items' || collection === 'hidden-homepage-carousel') {
     // get products for home page
     const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
@@ -295,7 +287,6 @@ export async function getCollectionProducts({
     // get products from all categories
     let allProducts = await fetchCategoryProducts(limitedCategories);
     allProducts = await fetchProductsPricing(allProducts);
-    console.log('getCollectionProducts API end', new Date());
     return allProducts;
   } else {
     // get products from selected category (collection)
@@ -307,7 +298,6 @@ export async function getCollectionProducts({
     ]
     let categoryProducts = await fetchCategoryProducts(categories)
     categoryProducts = await fetchProductsPricing(categoryProducts);
-    console.log('getCollectionProducts API end', new Date());
     return categoryProducts;
   }
 }
@@ -344,7 +334,6 @@ export async function getAllCategoryDetails() {
 }
 
 export async function getAllCategoriesHavingProducts(): Promise<Category[]> {
-  console.log('getAllCategoriesHavingProducts API');
   const categories = await getAllCategoryDetails();
   const categoriesHavingProducts: Category[] = [];
   for (const cetagory of categories) {
@@ -513,7 +502,6 @@ function mapPricingToProduct(product: Product, pricingResponse: PricingApiRespon
 }
 
 export async function getProduct(handle: string): Promise<Product | undefined> {
-  console.log('getProduct');
   return await fetchProductDetails(handle);
 }
 
@@ -599,7 +587,6 @@ function extractProductVariants(apiResponse: any, pricingApiResponse: PricingApi
 }
 
 export async function getCollections(): Promise<Collection[]> {
-  console.log('getCollections');
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
   const sortedCategories = categoriesHavingProducts.sort((a, b) =>
     a.categoryName.localeCompare(b.categoryName)
@@ -619,7 +606,6 @@ export async function getCollections(): Promise<Collection[]> {
 }
 
 export async function getMenu(handle: string): Promise<Menu[]> {
-  console.log('getMenu API', handle);
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
   const sortedCategories = categoriesHavingProducts.sort((a, b) =>
     a.categoryName.localeCompare(b.categoryName)
@@ -635,17 +621,14 @@ export async function getMenu(handle: string): Promise<Menu[]> {
 }
 
 export async function getPage(handle: string): Promise<Page | undefined> {
-  console.log('getPage');
   return undefined;
 }
 
 export async function getPages(): Promise<Page[]> {
-  console.log('getPages');
   return [];
 }
 
 export async function getProductRecommendations(productId: string): Promise<Product[]> {
-  console.log('getProductRecommendations');
   return [];
 }
 
@@ -658,12 +641,10 @@ export async function getProducts({
   reverse?: boolean;
   sortKey?: string;
 }): Promise<Product[]> {
-  console.log('getProducts');
   return [];
 }
 
 export async function fetchSessionContextDetails(): Promise<boolean> {
-  console.log('fetchSessionContextDetails API');
   let isGuestUser = null;
   try {
     const endpoint =
