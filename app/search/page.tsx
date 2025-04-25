@@ -2,6 +2,8 @@ import Grid from 'components/grid';
 import ProductGridItems from 'components/layout/product-grid-items';
 import { defaultSort, sorting } from 'lib/constants';
 import { getProducts } from 'lib/sfdc';
+import { Suspense } from 'react';
+import Loading from './loading';
 
 export const metadata = {
   title: 'Search',
@@ -11,7 +13,6 @@ export const metadata = {
 export default async function SearchPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  console.log('SearchPage');
   const searchParams = await props.searchParams;
   const { sort, q: searchValue } = searchParams as { [key: string]: string };
   const { sortKey, reverse } = sorting.find((item) => item.slug === sort) || defaultSort;
@@ -20,7 +21,7 @@ export default async function SearchPage(props: {
   const resultsText = products.length > 1 ? 'results' : 'result';
 
   return (
-    <>
+    <Suspense fallback={<Loading />}>
       {searchValue ? (
         <p className="mb-4">
           {products.length === 0
@@ -34,6 +35,6 @@ export default async function SearchPage(props: {
           <ProductGridItems products={products} />
         </Grid>
       ) : null}
-    </>
+    </Suspense>
   );
 }

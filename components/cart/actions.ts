@@ -3,11 +3,12 @@
 import { getCartIdFromCookie, setCartIdInCookie } from 'app/api/auth/authUtil';
 import { TAGS } from 'lib/constants';
 import { addToCart, createCart, getCart, removeFromCart, updateCart } from 'lib/sfdc';
+import { Cart } from 'lib/sfdc/types';
 import { revalidateTag } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { getCookie } from 'lib/server-cookies';
 
 export async function addItem(prevState: any, selectedVariantId: string | undefined) {
-  console.log('addItem');
   const cartId = await getCartIdFromCookie();
 
   // if (!cartId || !selectedVariantId) {
@@ -23,7 +24,6 @@ export async function addItem(prevState: any, selectedVariantId: string | undefi
 }
 
 export async function removeItem(prevState: any, merchandiseId: string) {
-  console.log('removeItem');
   const cartId = await getCartIdFromCookie();
 
   // if (!cartId) {
@@ -57,7 +57,6 @@ export async function updateItemQuantity(
     quantity: number;
   }
 ) {
-  console.log('updateItemQuantity');
   const cartId = await getCartIdFromCookie();
 
   // if (!cartId) {
@@ -96,13 +95,24 @@ export async function updateItemQuantity(
 export async function redirectToCheckout() {
   const cartId = await getCartIdFromCookie();
   let cart = await getCart(cartId!);
-
   redirect(cart!.checkoutUrl);
 }
 
-export async function createCartAndSetCookie() {
-  let cart = await createCart();
-  if (cart) {
-    await setCartIdInCookie(cart.id!);
+export async function createCartAndSetCookie(cart: Cart) {
+  try {
+    const cartId = await getCookie('cartId');
+    if (cartId) {
+      return cartId;
+    }
+
+    const response = await createCart();
+    if (response?.id) {
+      setCartIdInCookie(response.id);
+      return response.id;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error creating cart:', error);
+    return null;
   }
 }

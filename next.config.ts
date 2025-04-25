@@ -1,10 +1,14 @@
 export default {
   images: {
-    domains: ['s3.amazonaws.com'],
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'alpinecommerce32.my.site.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 's3.amazonaws.com',
         pathname: '/**',
       }
     ],

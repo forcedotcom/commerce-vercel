@@ -8,13 +8,9 @@ import MobileMenu from './mobile-menu';
 import Search, { SearchSkeleton } from './search';
 import { LogoutButton } from './LogoutButton';
 import { SFDC_COMMERCE_WEBSTORE_NAME } from 'lib/constants';
-import { getIsGuestUserFromCookie } from 'app/api/auth/authUtil';
 
 
-export async function Navbar() {
-  console.log('Navbar');
-
-  const isGuestUser = await getIsGuestUserFromCookie();
+export async function Navbar({ isGuestUser }: { isGuestUser: boolean | null }) {
   const menu = await getMenu('next-js-frontend-header-menu');
 
   return (
@@ -59,7 +55,7 @@ export async function Navbar() {
         </div>
         <div className="flex justify-end md:w-1/3">
           <LogoutButton isGuestUser={isGuestUser} />
-          <CartModal />
+          {isGuestUser !== null && <CartModal />}
         </div>
       </div>
     </nav>

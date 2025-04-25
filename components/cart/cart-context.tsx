@@ -22,7 +22,6 @@ function calculateItemCost(quantity: number, price: string): string {
 }
 
 function updateCartItem(item: CartItem, updateType: UpdateType): CartItem | null {
-  console.log('updateCartItem');
   if (updateType === 'delete') return null;
 
   const newQuantity = updateType === 'plus' ? item.quantity + 1 : item.quantity - 1;
@@ -105,7 +104,6 @@ function createEmptyCart(): Cart {
 }
 
 function cartReducer(state: Cart | undefined, action: CartAction): Cart {
-  console.log('cartReducer');
   const currentCart = state || createEmptyCart();
 
   switch (action.type) {
@@ -154,7 +152,6 @@ export function CartProvider({
   children: React.ReactNode;
   cartPromise: Promise<Cart | undefined>;
 }) {
-  console.log('CartProvider');
   const initialCart = use(cartPromise);
   const [optimisticCart, updateOptimisticCart] = useOptimistic(initialCart, cartReducer);
 

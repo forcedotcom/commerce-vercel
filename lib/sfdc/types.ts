@@ -285,3 +285,18 @@ export type PricingApiResponse = {
   currencyIsoCode: string,
 };
 
+export interface CookieOptions {
+  maxAge?: number;
+  path?: string;
+  domain?: string;
+  secure?: boolean;
+  httpOnly?: boolean;
+  sameSite?: 'strict' | 'lax' | 'none';
+}
+
+export const defaultCookieOptions: CookieOptions = {
+  path: '/',
+  secure: process.env.NODE_ENV === 'production',
+  httpOnly: true,
+  sameSite: 'lax'
+};
