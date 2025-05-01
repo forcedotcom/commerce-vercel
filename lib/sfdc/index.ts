@@ -39,6 +39,50 @@ export enum HttpMethod {
   DELETE = 'DELETE'
 }
 
+// Cache implementation
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+class Cache<T> {
+  private cache: Map<string, CacheEntry<T>>;
+  private ttl: number; // Time to live in milliseconds
+
+  constructor(ttl: number = 24 * 60 * 60 * 1000) { // Default 24 hours TTL
+    this.cache = new Map();
+    this.ttl = ttl;
+  }
+
+  set(key: string, value: T): void {
+    this.cache.set(key, {
+      data: value,
+      timestamp: Date.now()
+    });
+  }
+
+  get(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+
+    const isExpired = Date.now() - entry.timestamp > this.ttl;
+    if (isExpired) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return entry.data;
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
+// Initialize cache for categories and products
+const categoriesCache = new Cache<Category[]>(24 * 60 * 60 * 1000); // 24 hours TTL
+const productsCache = new Cache<Product[]>(24 * 60 * 60 * 1000); // 24 hours TTL
+const productPricingCache = new Cache<PricingApiResponse>(6 * 60 * 60 * 1000); // 6 hours TTL for pricing
 
 async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: object, req?: NextRequest): Promise<any> {
   try {
@@ -153,7 +197,6 @@ export async function addToCart(
   cartId: string | null,
   lines: { productId: string; quantity: number, type: string }
 ): Promise<Cart> {
-  console.log('addToCart');
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
   const requestBody = {
@@ -334,13 +377,24 @@ export async function getAllCategoryDetails() {
 }
 
 export async function getAllCategoriesHavingProducts(): Promise<Category[]> {
+  // Check cache first
+  const cachedCategories = categoriesCache.get('categories');
+  if (cachedCategories) {
+    return cachedCategories;
+  }
+
+  // If not in cache, fetch from API
   const categories = await getAllCategoryDetails();
   const categoriesHavingProducts: Category[] = [];
-  for (const cetagory of categories) {
-    if (cetagory.numberOfProducts != null && cetagory.numberOfProducts > 0) {
-      categoriesHavingProducts.push(cetagory);
+  
+  for (const category of categories) {
+    if (category.numberOfProducts != null && category.numberOfProducts > 0) {
+      categoriesHavingProducts.push(category);
     }
   }
+  // Store in cache
+  categoriesCache.set('categories', categoriesHavingProducts);
+
   return categoriesHavingProducts;
 }
 
@@ -417,7 +471,14 @@ function extractChildCategories(
 }
 
 async function fetchCategoryProducts(categories: Category[]): Promise<Product[]> {
-  const fetchPromises = categories.map(async (category) => {
+  const productPromises = categories.map(async (category) => {
+    // Check cache for this category
+    const cachedProducts = productsCache.get(category.categoryId);
+    if (cachedProducts) {
+      console.log('cachedProducts', cachedProducts.length);
+      return cachedProducts;
+    }
+
     try {
       const endpoint =
         SFDC_COMMERCE_WEBSTORE_API_URL +
@@ -427,15 +488,20 @@ async function fetchCategoryProducts(categories: Category[]): Promise<Product[]>
         category.categoryId;
 
       const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
-      return mapCategoryProductsToProduct(response);
+      const categoryProducts = mapCategoryProductsToProduct(response);
+      
+      // Cache products for this category
+      productsCache.set(category.categoryId, categoryProducts);
+      
+      return categoryProducts;
     } catch (error) {
       console.error(`Error fetching products for category ${category.categoryId}:`, error);
-      return []; // Skip on error
+      return [];
     }
   });
 
-  const results = await Promise.all(fetchPromises);
-  return results.flat(); // Flatten array of arrays
+  const productsArrays = await Promise.all(productPromises);
+  return productsArrays.flat();
 }
 
 function mapCategoryProductsToProduct(apiResponse: any): Product[] {
@@ -454,16 +520,23 @@ function mapCategoryProductsToProduct(apiResponse: any): Product[] {
 async function fetchProductsPricing(products: Product[]): Promise<Product[]> {
   const pricingPromises = products.map(async (product) => {
     try {
-      const pricingApiResponse = await fetchProductPricingDetails(product.id);
+      // Check cache for this product's pricing
+      const cachedPricing = productPricingCache.get(product.id);
+      let pricingApiResponse;
+      if (cachedPricing) {
+        pricingApiResponse = cachedPricing;
+      } else {
+        pricingApiResponse = await fetchProductPricingDetails(product.id);
+        // Cache the pricing response
+        productPricingCache.set(product.id, pricingApiResponse);
+      }
       return mapPricingToProduct(product, pricingApiResponse);
     } catch (error) {
       console.error(`Skipping pricing for product ${product.id} due to error.`);
       return product; // return product as-is if pricing fails
     }
   });
-
-  const updatedProducts = await Promise.all(pricingPromises);
-  return updatedProducts;
+  return Promise.all(pricingPromises);
 }
 
 async function fetchProductPricingDetails(productId: string): Promise<PricingApiResponse> {
@@ -484,8 +557,6 @@ async function fetchProductPricingDetails(productId: string): Promise<PricingApi
     throw error;
   }
 }
-
-
 
 function mapPricingToProduct(product: Product, pricingResponse: PricingApiResponse): Product {
   product.priceRange = {
@@ -511,7 +582,8 @@ async function fetchProductDetails(productId: string): Promise<any> {
       const endpoint =
         SFDC_COMMERCE_WEBSTORE_API_URL + '/' +
         SFDC_COMMERCE_WEBSTORE_ID +
-        PRODUCT_DETAILS_URL + '/' +
+        PRODUCT_DETAILS_URL +
+        '/' +
         productId;
 
       const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
