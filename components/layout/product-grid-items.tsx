@@ -17,11 +17,12 @@ export default function ProductGridItems({ products }: { products: Product[] }) 
               alt={product.title}
               label={{
                 title: product.title,
-                amount: product.priceRange.maxVariantPrice.amount,
-                currencyCode: product.priceRange.maxVariantPrice.currencyCode
+                amount: product.priceRange?.maxVariantPrice?.amount || '0',
+                currencyCode: product.priceRange?.maxVariantPrice?.currencyCode || 'USD'
               }}
               src={product.featuredImage?.url}
-              fill
+              width={600}
+              height={600}
               sizes="(min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw"
             />
           </Link>

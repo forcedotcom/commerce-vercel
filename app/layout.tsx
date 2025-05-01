@@ -4,11 +4,12 @@ import { WelcomeToast } from 'components/welcome-toast';
 import { GeistSans } from 'geist/font/sans';
 import { getCart } from 'lib/sfdc';
 import { ensureStartsWith } from 'lib/utils';
-import { ReactNode } from 'react';
+import { ReactNode, Suspense } from 'react';
 import { Toaster } from 'sonner';
 import './globals.css';
 import { getCartIdFromCookie, getIsGuestUserFromCookie } from './api/auth/authUtil';
 import { Cart } from 'lib/sfdc/types';
+import Loading from './loading';
 
 const { TWITTER_CREATOR, TWITTER_SITE, SITE_NAME } = process.env;
 const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
@@ -49,9 +50,13 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en" className={GeistSans.variable}>
       <body className="bg-neutral-50 text-black selection:bg-teal-300 dark:bg-neutral-900 dark:text-white dark:selection:bg-pink-500 dark:selection:text-white">
         <CartProvider cartPromise={cartPromise}>
-          <Navbar isGuestUser={isGuestUser}/>
+          <Suspense fallback={<div className="h-16 w-full animate-pulse bg-neutral-100" />}>
+            <Navbar isGuestUser={isGuestUser} />
+          </Suspense>
           <main>
-            {children}
+            <Suspense fallback={<Loading />}>
+              {children}
+            </Suspense>
             <Toaster closeButton />
             <WelcomeToast />
           </main>

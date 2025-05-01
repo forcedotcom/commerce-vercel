@@ -39,51 +39,6 @@ export enum HttpMethod {
   DELETE = 'DELETE'
 }
 
-// Cache implementation
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-}
-
-class Cache<T> {
-  private cache: Map<string, CacheEntry<T>>;
-  private ttl: number; // Time to live in milliseconds
-
-  constructor(ttl: number = 24 * 60 * 60 * 1000) { // Default 24 hours TTL
-    this.cache = new Map();
-    this.ttl = ttl;
-  }
-
-  set(key: string, value: T): void {
-    this.cache.set(key, {
-      data: value,
-      timestamp: Date.now()
-    });
-  }
-
-  get(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-
-    const isExpired = Date.now() - entry.timestamp > this.ttl;
-    if (isExpired) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return entry.data;
-  }
-
-  clear(): void {
-    this.cache.clear();
-  }
-}
-
-// Initialize cache for categories and products
-const categoriesCache = new Cache<Category[]>(24 * 60 * 60 * 1000); // 24 hours TTL
-const productsCache = new Cache<Product[]>(24 * 60 * 60 * 1000); // 24 hours TTL
-const productPricingCache = new Cache<PricingApiResponse>(6 * 60 * 60 * 1000); // 6 hours TTL for pricing
-
 async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: object, req?: NextRequest): Promise<any> {
   try {
     // get is guest user from cookie
@@ -234,16 +189,22 @@ export async function updateCart(
 export async function getCart(cartId: string | null): Promise<Cart | undefined> {
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
-  const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
+    
+  // Create promises for both API calls
+  const cartPromise = makeSfdcApiCall(endpoint, HttpMethod.GET);
+  const cartItemsPromise = getCartItems();
+
+  // Execute both promises in parallel
+  const [cartResponse, cartItems] = await Promise.all([cartPromise, cartItemsPromise]);
 
   // Old carts becomes `null` when you checkout.
-  if (!response) {
+  if (!cartResponse) {
     return undefined;
   }
-  const cart: Cart = mapCart(response);
+
+  const cart: Cart = mapCart(cartResponse);
   if (cart && cart.id) {
-    const cartItem: CartItem[] = await getCartItems(cart.id);
-    cart.lines = cartItem;
+    cart.lines = cartItems;
   }
   return cart;
 }
@@ -263,7 +224,7 @@ function mapCart(response: any): Cart {
   return cart;
 }
 
-export async function getCartItems(cartId: string): Promise<CartItem[]> {
+export async function getCartItems(): Promise<CartItem[]> {
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
   const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
@@ -320,28 +281,44 @@ export async function getCollectionProducts({
   sortKey?: string;
 }): Promise<Product[]> {
   if (collection === 'hidden-homepage-featured-items' || collection === 'hidden-homepage-carousel') {
-    // get products for home page
+    // Get products for home page
     const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
     const sortedCategories = categoriesHavingProducts.sort((a, b) =>
       a.categoryName.localeCompare(b.categoryName)
     );
     const limitedCategories = getLimitedCategories(sortedCategories);
 
-    // get products from all categories
-    let allProducts = await fetchCategoryProducts(limitedCategories);
-    allProducts = await fetchProductsPricing(allProducts);
-    return allProducts;
+    // First fetch all products
+    const products = await fetchCategoryProducts(limitedCategories);
+    
+    // Then fetch pricing for those products
+    const pricingData = await fetchProductsPricingBatch(products.map(product => product.id));
+
+    // Merge pricing data with products
+    return products.map(product => ({
+      ...product,
+      priceRange: pricingData[product.id]
+    }));
   } else {
-    // get products from selected category (collection)
+    // Get products from selected category (collection)
     const categories: Category[] = [
       {
         categoryId: collection,
         categoryName: ''
       }
-    ]
-    let categoryProducts = await fetchCategoryProducts(categories)
-    categoryProducts = await fetchProductsPricing(categoryProducts);
-    return categoryProducts;
+    ];
+
+    // Fetch category products
+    const categoryProducts = await fetchCategoryProducts(categories);
+    
+    // Then fetch pricing for those products
+    const pricingData = await fetchProductsPricingBatch(categoryProducts.map(product => product.id));
+
+    // Merge pricing data with products
+    return categoryProducts.map(product => ({
+      ...product,
+      priceRange: pricingData[product.id]
+    }));
   }
 }
 
@@ -364,7 +341,6 @@ function getLimitedCategories(categories: Category[], maxProducts = 10): Categor
   return selectedCategories;
 }
 
-
 export async function getAllCategoryDetails() {
   // get parent categories
   const parentCategories = await fetchParentCategories();
@@ -377,25 +353,8 @@ export async function getAllCategoryDetails() {
 }
 
 export async function getAllCategoriesHavingProducts(): Promise<Category[]> {
-  // Check cache first
-  const cachedCategories = categoriesCache.get('categories');
-  if (cachedCategories) {
-    return cachedCategories;
-  }
-
-  // If not in cache, fetch from API
   const categories = await getAllCategoryDetails();
-  const categoriesHavingProducts: Category[] = [];
-  
-  for (const category of categories) {
-    if (category.numberOfProducts != null && category.numberOfProducts > 0) {
-      categoriesHavingProducts.push(category);
-    }
-  }
-  // Store in cache
-  categoriesCache.set('categories', categoriesHavingProducts);
-
-  return categoriesHavingProducts;
+  return categories.filter(category => category.numberOfProducts != null && category.numberOfProducts > 0);
 }
 
 async function fetchParentCategories(): Promise<Category[]> {
@@ -472,13 +431,6 @@ function extractChildCategories(
 
 async function fetchCategoryProducts(categories: Category[]): Promise<Product[]> {
   const productPromises = categories.map(async (category) => {
-    // Check cache for this category
-    const cachedProducts = productsCache.get(category.categoryId);
-    if (cachedProducts) {
-      console.log('cachedProducts', cachedProducts.length);
-      return cachedProducts;
-    }
-
     try {
       const endpoint =
         SFDC_COMMERCE_WEBSTORE_API_URL +
@@ -488,12 +440,7 @@ async function fetchCategoryProducts(categories: Category[]): Promise<Product[]>
         category.categoryId;
 
       const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
-      const categoryProducts = mapCategoryProductsToProduct(response);
-      
-      // Cache products for this category
-      productsCache.set(category.categoryId, categoryProducts);
-      
-      return categoryProducts;
+      return mapCategoryProductsToProduct(response);
     } catch (error) {
       console.error(`Error fetching products for category ${category.categoryId}:`, error);
       return [];
@@ -517,44 +464,37 @@ function mapCategoryProductsToProduct(apiResponse: any): Product[] {
   }));
 }
 
-async function fetchProductsPricing(products: Product[]): Promise<Product[]> {
-  const pricingPromises = products.map(async (product) => {
-    try {
-      // Check cache for this product's pricing
-      const cachedPricing = productPricingCache.get(product.id);
-      let pricingApiResponse;
-      if (cachedPricing) {
-        pricingApiResponse = cachedPricing;
-      } else {
-        pricingApiResponse = await fetchProductPricingDetails(product.id);
-        // Cache the pricing response
-        productPricingCache.set(product.id, pricingApiResponse);
-      }
-      return mapPricingToProduct(product, pricingApiResponse);
-    } catch (error) {
-      console.error(`Skipping pricing for product ${product.id} due to error.`);
-      return product; // return product as-is if pricing fails
-    }
-  });
-  return Promise.all(pricingPromises);
-}
-
 async function fetchProductPricingDetails(productId: string): Promise<PricingApiResponse> {
   try {
     const endpoint = `${SFDC_COMMERCE_WEBSTORE_API_URL}/${SFDC_COMMERCE_WEBSTORE_ID}${PRODUCTS_PRICING_URL}${productId}`;
     const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
+
     if (!response?.success || !response.pricingLineItemResults?.length) {
       throw new Error("Invalid response or no pricing data available");
     }
+
     const pricingData = response.pricingLineItemResults[0];
-    return {
+
+    // Ensure we have valid pricing values
+    if (!pricingData.unitPrice || !pricingData.listPrice || !response.currencyIsoCode) {
+      console.error(`[DEBUG] Missing required pricing fields for ${productId}:`, pricingData);
+      throw new Error("Missing required pricing fields");
+    }
+
+    const result = {
       unitPrice: pricingData.unitPrice,
       listPrice: pricingData.listPrice,
       currencyIsoCode: response.currencyIsoCode,
     };
+    return result;
   } catch (error) {
-    console.error(`Error fetching product pricing details for product ${productId}:`, error);
-    throw error;
+    console.error(`[DEBUG] Error fetching product pricing details for product ${productId}:`, error);
+    // Return default pricing on error
+    return {
+      unitPrice: '0',
+      listPrice: '0',
+      currencyIsoCode: 'USD'
+    };
   }
 }
 
@@ -562,12 +502,12 @@ function mapPricingToProduct(product: Product, pricingResponse: PricingApiRespon
   product.priceRange = {
     maxVariantPrice: {
       amount: pricingResponse.unitPrice,
-      currencyCode: pricingResponse.currencyIsoCode,
+      currencyCode: pricingResponse.currencyIsoCode
     },
     minVariantPrice: {
       amount: pricingResponse.listPrice,
-      currencyCode: pricingResponse.currencyIsoCode,
-    },
+      currencyCode: pricingResponse.currencyIsoCode
+    }
   };
   return product;
 }
@@ -759,4 +699,70 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
   }
 
   return NextResponse.json({ status: 200, revalidated: true, now: Date.now() });
+}
+
+async function fetchProductsPricingBatch(productIds: string[]): Promise<Record<string, any>> {
+  const pricingData: Record<string, any> = {};
+  
+  try {
+    // Create individual pricing promises for each product
+    const pricingPromises = productIds.map(async (productId) => {
+      try {
+        const pricingResponse = await fetchProductPricingDetails(productId);
+        return {
+          productId,
+          pricing: {
+            minVariantPrice: {
+              amount: pricingResponse.listPrice,
+              currencyCode: pricingResponse.currencyIsoCode
+            },
+            maxVariantPrice: {
+              amount: pricingResponse.unitPrice,
+              currencyCode: pricingResponse.currencyIsoCode
+            }
+          }
+        };
+      } catch (error) {
+        console.error(`Error fetching pricing for product ${productId}:`, error);
+        return {
+          productId,
+          pricing: {
+            minVariantPrice: {
+              amount: '0',
+              currencyCode: 'USD'
+            },
+            maxVariantPrice: {
+              amount: '0',
+              currencyCode: 'USD'
+            }
+          }
+        };
+      }
+    });
+    
+    // Wait for all pricing requests to complete
+    const results = await Promise.all(pricingPromises);
+    results.forEach(result => {
+      pricingData[result.productId] = result.pricing;
+    });
+  } catch (error) {
+    console.error('Error in batch pricing operation:', error);
+    // Set default pricing for all requested products if batch operation fails
+    productIds.forEach(id => {
+      if (!pricingData[id]) {
+        pricingData[id] = {
+          minVariantPrice: {
+            amount: '0',
+            currencyCode: 'USD'
+          },
+          maxVariantPrice: {
+            amount: '0',
+            currencyCode: 'USD'
+          }
+        };
+      }
+    });
+  }
+  
+  return pricingData;
 }
