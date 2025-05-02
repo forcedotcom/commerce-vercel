@@ -12,7 +12,16 @@ export default async function CategoryPage(props: {
   const params = await props.params;
   const { sort } = searchParams as { [key: string]: string };
   const { sortKey, reverse } = sorting.find((item) => item.slug === sort) || defaultSort;
-  const products = await getCollectionProducts({ collection: params.collection, sortKey, reverse });
+  const products = await getCollectionProducts({
+    categories: [
+      {
+        categoryId: params.collection,
+        categoryName: '',
+      }
+    ],
+    sortKey,
+    reverse
+  });
   return (
     <section>
       {products.length === 0 ? (

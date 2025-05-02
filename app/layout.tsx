@@ -42,7 +42,7 @@ export const metadata = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const cartId = await getCartIdFromCookie();
   const isGuestUser = await getIsGuestUserFromCookie();
-  const menuPromise = getMenu('next-js-frontend-header-menu');
+  const menuPromise = getMenu();
   
   const cartPromise: Promise<Cart | undefined> = isGuestUser !== null 
     ? getCart(cartId!) 

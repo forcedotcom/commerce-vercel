@@ -21,7 +21,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   Cart,
   Collection,
-  Menu,
   Page,
   Product,
   Category,
@@ -189,7 +188,7 @@ export async function updateCart(
 export async function getCart(cartId: string | null): Promise<Cart | undefined> {
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
-    
+
   // Create promises for both API calls
   const cartPromise = makeSfdcApiCall(endpoint, HttpMethod.GET);
   const cartItemsPromise = getCartItems();
@@ -272,57 +271,28 @@ export async function getCollection(handle: string): Promise<Collection | undefi
 }
 
 export async function getCollectionProducts({
-  collection,
+  categories,
   reverse,
-  sortKey
+  sortKey,
 }: {
-  collection: string;
+  categories: Category[];
   reverse?: boolean;
   sortKey?: string;
 }): Promise<Product[]> {
-  if (collection === 'hidden-homepage-featured-items' || collection === 'hidden-homepage-carousel') {
-    // Get products for home page
-    const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
-    const sortedCategories = categoriesHavingProducts.sort((a, b) =>
-      a.categoryName.localeCompare(b.categoryName)
-    );
-    const limitedCategories = getLimitedCategories(sortedCategories);
+  // Fetch products based on categories
+  const categoryProducts = await fetchCategoryProducts(categories);
+  
+  // Then fetch pricing for those products
+  const pricingData = await fetchProductsPricingBatch(categoryProducts.map(product => product.id));
 
-    // First fetch all products
-    const products = await fetchCategoryProducts(limitedCategories);
-    
-    // Then fetch pricing for those products
-    const pricingData = await fetchProductsPricingBatch(products.map(product => product.id));
-
-    // Merge pricing data with products
-    return products.map(product => ({
-      ...product,
-      priceRange: pricingData[product.id]
-    }));
-  } else {
-    // Get products from selected category (collection)
-    const categories: Category[] = [
-      {
-        categoryId: collection,
-        categoryName: ''
-      }
-    ];
-
-    // Fetch category products
-    const categoryProducts = await fetchCategoryProducts(categories);
-    
-    // Then fetch pricing for those products
-    const pricingData = await fetchProductsPricingBatch(categoryProducts.map(product => product.id));
-
-    // Merge pricing data with products
-    return categoryProducts.map(product => ({
-      ...product,
-      priceRange: pricingData[product.id]
-    }));
-  }
+  // Merge pricing data with products
+  return categoryProducts.map(product => ({
+    ...product,
+    priceRange: pricingData[product.id]
+  }));
 }
 
-function getLimitedCategories(categories: Category[], maxProducts = 10): Category[] {
+export function getLimitedCategories(categories: Category[], maxProducts = 10): Category[] {
   let selectedCategories: Category[] = [];
   let totalProducts = 0;
 
@@ -378,7 +348,7 @@ function extractParentCategories(response: any): Category[] {
       const { id, fields } = category;
       if (fields?.IsNavigational === 'true' && id && fields.Name) {
         uniqueCategories.set(id, {
-          categoryId: id, categoryName: fields.Name, numberOfProducts: fields.NumberOfProducts
+          categoryId: id, categoryName: fields.Name, numberOfProducts: fields.NumberOfProducts, path: `search/${id}`
         });
       }
     });
@@ -397,7 +367,7 @@ async function fetchChildCategories(parentCategories: Category[]): Promise<Categ
         parent.categoryId;
 
       const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
-      return extractChildCategories(response, parent.categoryId, parent.categoryName);
+      return extractChildCategories(response, parent.categoryId, parent.categoryName || '');
     } catch (error) {
       console.error(`Error fetching child categories from parent category ${parent.categoryId}:`, error);
       return []; // Gracefully skip this parent
@@ -422,7 +392,8 @@ function extractChildCategories(
         categoryName: fields.Name,
         parentCategoryId: parentCategoryId,
         parentCategoryName: parentCategoryName,
-        numberOfProducts: fields.NumberOfProducts
+        numberOfProducts: fields.NumberOfProducts,
+        path: `search/${id}`
       });
     }
   });
@@ -617,20 +588,13 @@ export async function getCollections(): Promise<Collection[]> {
   return categoryAsCollections;
 }
 
-export async function getMenu(handle: string): Promise<Menu[]> {
+export async function getMenu(): Promise<Category[]> {
   console.log('getMenu');
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
   const sortedCategories = categoriesHavingProducts.sort((a, b) =>
     a.categoryName.localeCompare(b.categoryName)
   );
-  const categoryAsMenueItems = sortedCategories.map(({ categoryId, categoryName }) => ({
-    title: categoryName,
-    path: `search/${categoryId}`,
-  }));
-  if (handle === 'next-js-frontend-footer-menu' || handle === 'next-js-frontend-header-menu') {
-    return categoryAsMenueItems.slice(0, 3);
-  }
-  return categoryAsMenueItems;
+  return sortedCategories;
 }
 
 export async function getPage(handle: string): Promise<Page | undefined> {
@@ -704,7 +668,7 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
 
 async function fetchProductsPricingBatch(productIds: string[]): Promise<Record<string, any>> {
   const pricingData: Record<string, any> = {};
-  
+
   try {
     // Create individual pricing promises for each product
     const pricingPromises = productIds.map(async (productId) => {
@@ -740,7 +704,7 @@ async function fetchProductsPricingBatch(productIds: string[]): Promise<Record<s
         };
       }
     });
-    
+
     // Wait for all pricing requests to complete
     const results = await Promise.all(pricingPromises);
     results.forEach(result => {
@@ -764,6 +728,6 @@ async function fetchProductsPricingBatch(productIds: string[]): Promise<Record<s
       }
     });
   }
-  
+
   return pricingData;
 }
