@@ -1,12 +1,10 @@
 import Link from 'next/link';
-import { GridTileImage } from './grid/tile';
+import { GridTileImage } from 'components/grid/tile';
 import { Product } from 'lib/sfdc/types';
 
-type CarouselProducts = {
-  products: Product[];
-};
+export type CarouselProducts = { products: Product[] };
 
-export async function Carousel({ products }: CarouselProducts) {
+export function Carousel({ products }: CarouselProducts) {
   // Collections that start with `hidden-*` are hidden from the search page.
 
   if (!products?.length) return null;
@@ -27,12 +25,13 @@ export async function Carousel({ products }: CarouselProducts) {
                 alt={product.title}
                 label={{
                   title: product.title,
-                  amount: product?.priceRange?.maxVariantPrice.amount,
-                  currencyCode: product?.priceRange?.maxVariantPrice.currencyCode
+                  amount: product.priceRange?.maxVariantPrice.amount,
+                  currencyCode: product.priceRange?.maxVariantPrice.currencyCode
                 }}
-                src={product?.featuredImage?.url}
+                src={product.featuredImage?.url}
                 fill
                 sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
+                loading={i < 3 ? "eager" : "lazy"}
               />
             </Link>
           </li>

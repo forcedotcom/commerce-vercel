@@ -9,14 +9,16 @@ export async function middleware(request: NextRequest) {
   const guestUuidInCookie = request.cookies.get(SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME)?.value;
   const authToken = request.cookies.get(SFDC_AUTH_TOKEN_COOKIE_NAME)?.value;
 
-  let isGuestUserRes = null;
+  let isGuestUserRes = true; // Default to true (guest user)
 
-  try {
-    // Check session context to identify if the user is guest or authenticated
-    const sessionInfo = await fetchSessionContextDetails();
-    isGuestUserRes = sessionInfo;
-  } catch (err) {
-    console.error('Error fetching session context:', err);
+  if (authToken) {
+    try {
+      // Only check session context when auth token exists
+      const sessionInfo = await fetchSessionContextDetails();
+      isGuestUserRes = sessionInfo;
+    } catch (err) {
+      console.error('Error fetching session context:', err);
+    }
   }
 
   // Scenario 1: Auth token exists but session is invalid (i.e. user is actually guest)
@@ -28,16 +30,14 @@ export async function middleware(request: NextRequest) {
     res.cookies.delete(CSRF_TOKEN_COOKIE_NAME);
   }
 
-  // Scenario 2: Set isGuestUser cookie only if we have a definitive response
-  if (isGuestUserRes !== null) {
-    res.cookies.set(IS_GUEST_USER_COOKIE_NAME, JSON.stringify(isGuestUserRes), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      path: '/',
-    });
-    res.headers.set('x-guest-user', JSON.stringify(isGuestUserRes));
-  }
+  // Set isGuestUser cookie
+  res.cookies.set(IS_GUEST_USER_COOKIE_NAME, JSON.stringify(isGuestUserRes), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
+  });
+  res.headers.set('x-guest-user', JSON.stringify(isGuestUserRes));
 
   // Scenario 3: Generate guest UUID if not present
   if (!guestUuidInCookie) {

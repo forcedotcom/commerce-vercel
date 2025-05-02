@@ -3,12 +3,13 @@ import LogoSquare from 'components/logo-square';
 import { getMenu } from 'lib/sfdc';
 import { Menu } from 'lib/sfdc/types';
 import Link from 'next/link';
-import { Suspense } from 'react';
+import { Suspense, lazy } from 'react';
 import MobileMenu from './mobile-menu';
 import Search, { SearchSkeleton } from './search';
 import { LogoutButton } from './LogoutButton';
 import { SFDC_COMMERCE_WEBSTORE_NAME } from 'lib/constants';
 
+const LazyCartModal = lazy(() => import('components/cart/modal'));
 
 export async function Navbar({ isGuestUser }: { isGuestUser: boolean | null }) {
   const menu = await getMenu('next-js-frontend-header-menu');
@@ -55,7 +56,11 @@ export async function Navbar({ isGuestUser }: { isGuestUser: boolean | null }) {
         </div>
         <div className="flex justify-end md:w-1/3">
           <LogoutButton isGuestUser={isGuestUser} />
-          {isGuestUser !== null && <CartModal />}
+          {isGuestUser !== null && (
+            <Suspense fallback={<div className="h-11 w-11" />}>
+              <LazyCartModal />
+            </Suspense>
+          )}
         </div>
       </div>
     </nav>
