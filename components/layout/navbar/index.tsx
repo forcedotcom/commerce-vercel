@@ -1,6 +1,5 @@
 import CartModal from 'components/cart/modal';
 import LogoSquare from 'components/logo-square';
-import { getMenu } from 'lib/sfdc';
 import { Menu } from 'lib/sfdc/types';
 import Link from 'next/link';
 import { Suspense, lazy } from 'react';
@@ -11,9 +10,8 @@ import { SFDC_COMMERCE_WEBSTORE_NAME } from 'lib/constants';
 
 const LazyCartModal = lazy(() => import('components/cart/modal'));
 
-export async function Navbar({ isGuestUser }: { isGuestUser: boolean | null }) {
-  const menu = await getMenu('next-js-frontend-header-menu');
-
+export async function Navbar({ isGuestUser, menuPromise }: { isGuestUser: boolean | null; menuPromise: Promise<Menu[]> }) {
+  const menu = await menuPromise;
   return (
     <nav className="relative flex items-center justify-between p-4 lg:px-6">
       <div className="block flex-none md:hidden">

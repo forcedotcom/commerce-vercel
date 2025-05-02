@@ -618,6 +618,7 @@ export async function getCollections(): Promise<Collection[]> {
 }
 
 export async function getMenu(handle: string): Promise<Menu[]> {
+  console.log('getMenu');
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
   const sortedCategories = categoriesHavingProducts.sort((a, b) =>
     a.categoryName.localeCompare(b.categoryName)

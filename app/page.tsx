@@ -1,6 +1,5 @@
 import { Carousel } from 'components/carousel';
 import { ThreeItemGrid } from 'components/grid/three-items';
-import Footer from 'components/layout/footer';
 import { getCollectionProducts } from 'lib/sfdc';
 import { Product } from 'lib/sfdc/types';
 import { Suspense } from 'react';
@@ -21,7 +20,6 @@ export default function HomePage() {
       <Suspense fallback={<Loading />}>
         <HomePageContent />
       </Suspense>
-      <Footer />
     </>
   );
 }
