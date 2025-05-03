@@ -7,8 +7,6 @@ import { ProductDescription } from 'components/product/product-description';
 import { Gallery as ProductGallery } from 'components/product/gallery';
 import { ProductProvider } from 'components/product/product-context';
 
-export const runtime = 'edge';
-
 interface Props {
   params: Promise<{ handle: string }>;
 }

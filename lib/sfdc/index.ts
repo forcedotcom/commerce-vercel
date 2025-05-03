@@ -29,6 +29,7 @@ import {
   CartItem,
 } from './types';
 import { getCsrfTokenFromCookie, getGuestCartSessionUuid, getGuestEssentialUuidFromCookie, getIsGuestUserFromCookie, getSfdcAuthToken, setCartIdInCookie } from 'app/api/auth/authUtil';
+import { cache } from 'react';
 
 export enum HttpMethod {
   GET = 'GET',
@@ -63,7 +64,7 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
     const response = await fetch(endpoint, fetchOptions);
 
     if (!response.ok) {
-      console.error('HTTP error! ', response);
+      console.log('HTTP error! ', response);
     }
 
     // extract guest cart session id from response and set it to cookie
@@ -73,7 +74,7 @@ async function makeSfdcApiCall(endpoint: string, httpMethod: HttpMethod, body?: 
     const text = await response.text();
     return text ? JSON.parse(text) : null;
   } catch (error) {
-    console.error('Fetch Error:', error);
+    console.log('Fetch Error:', error);
   }
 }
 
@@ -281,15 +282,16 @@ export async function getCollectionProducts({
 }): Promise<Product[]> {
   // Fetch products based on categories
   const categoryProducts = await fetchCategoryProducts(categories);
-  
+
   // Then fetch pricing for those products
   const pricingData = await fetchProductsPricingBatch(categoryProducts.map(product => product.id));
 
   // Merge pricing data with products
-  return categoryProducts.map(product => ({
+  const result = categoryProducts.map(product => ({
     ...product,
-    priceRange: pricingData[product.id]
+    priceRange: pricingData ? pricingData[product.id] : undefined
   }));
+  return result;
 }
 
 export function getLimitedCategories(categories: Category[], maxProducts = 10): Category[] {
@@ -408,8 +410,8 @@ async function fetchCategoryProducts(categories: Category[]): Promise<Product[]>
         '/' +
         SFDC_COMMERCE_WEBSTORE_ID +
         CATEGORY_PRODUCTS_SEARCH_URL +
-        category.categoryId;
-
+        category.categoryId + '&pageSize=10';
+        
       const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
       return mapCategoryProductsToProduct(response);
     } catch (error) {
@@ -423,6 +425,9 @@ async function fetchCategoryProducts(categories: Category[]): Promise<Product[]>
 }
 
 function mapCategoryProductsToProduct(apiResponse: any): Product[] {
+  if (!apiResponse || !apiResponse.productsPage) {
+    return [];
+  }
   return apiResponse.productsPage.products.map((product: any) => ({
     id: product.id,
     title: product.name,
@@ -433,40 +438,6 @@ function mapCategoryProductsToProduct(apiResponse: any): Product[] {
       altText: product.defaultImage?.alternateText || "",
     }
   }));
-}
-
-async function fetchProductPricingDetails(productId: string): Promise<PricingApiResponse> {
-  try {
-    const endpoint = `${SFDC_COMMERCE_WEBSTORE_API_URL}/${SFDC_COMMERCE_WEBSTORE_ID}${PRODUCTS_PRICING_URL}${productId}`;
-    const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
-
-    if (!response?.success || !response.pricingLineItemResults?.length) {
-      throw new Error("Invalid response or no pricing data available");
-    }
-
-    const pricingData = response.pricingLineItemResults[0];
-
-    // Ensure we have valid pricing values
-    if (!pricingData.unitPrice || !pricingData.listPrice || !response.currencyIsoCode) {
-      console.error(`[DEBUG] Missing required pricing fields for ${productId}:`, pricingData);
-      throw new Error("Missing required pricing fields");
-    }
-
-    const result = {
-      unitPrice: pricingData.unitPrice,
-      listPrice: pricingData.listPrice,
-      currencyIsoCode: response.currencyIsoCode,
-    };
-    return result;
-  } catch (error) {
-    console.error(`[DEBUG] Error fetching product pricing details for product ${productId}:`, error);
-    // Return default pricing on error
-    return {
-      unitPrice: '0',
-      listPrice: '0',
-      currencyIsoCode: 'USD'
-    };
-  }
 }
 
 function mapPricingToProduct(product: Product, pricingResponse: PricingApiResponse): Product {
@@ -489,37 +460,40 @@ export async function getProduct(handle: string): Promise<Product | undefined> {
 
 async function fetchProductDetails(productId: string): Promise<any> {
   try {
-    const productDetailsPromise = (async () => {
-      const endpoint =
-        SFDC_COMMERCE_WEBSTORE_API_URL + '/' +
-        SFDC_COMMERCE_WEBSTORE_ID +
-        PRODUCT_DETAILS_URL +
-        '/' +
-        productId;
+    // Prepare endpoints
+    const productDetailsEndpoint =
+      SFDC_COMMERCE_WEBSTORE_API_URL + '/' +
+      SFDC_COMMERCE_WEBSTORE_ID +
+      PRODUCT_DETAILS_URL +
+      '/' +
+      productId;
 
-      const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
-      return { rawResponse: response, details: extractProductDetails(response) };
-    })();
-
-    const pricingPromise = fetchProductPricingDetails(productId);
-
-    // Run both in parallel
-    const [{ rawResponse, details }, pricingApiResponse] = await Promise.all([
-      productDetailsPromise,
-      pricingPromise,
+    // Fetch product details and pricing in parallel
+    const [productDetailsResponse, pricingBatch] = await Promise.all([
+      makeSfdcApiCall(productDetailsEndpoint, HttpMethod.GET),
+      fetchProductsPricingBatch([productId])
     ]);
 
+    const details = extractProductDetails(productDetailsResponse);
+    const pricingApiResponse = pricingBatch[productId] ? {
+      unitPrice: pricingBatch[productId].maxVariantPrice.amount,
+      listPrice: pricingBatch[productId].minVariantPrice.amount,
+      currencyIsoCode: pricingBatch[productId].maxVariantPrice.currencyCode,
+    } : {
+      unitPrice: '0',
+      listPrice: '0',
+      currencyIsoCode: 'USD',
+    };
+
     const productWithPricing = mapPricingToProduct(details, pricingApiResponse);
-    productWithPricing.variants = extractProductVariants(rawResponse, pricingApiResponse);
+    productWithPricing.variants = extractProductVariants(productDetailsResponse, pricingApiResponse);
 
     return productWithPricing;
-
   } catch (error) {
     console.error(`Error fetching product details for ${productId}:`, error);
     return undefined;
   }
 }
-
 
 function extractProductDetails(apiResponse: any): any {
   return {
@@ -588,14 +562,22 @@ export async function getCollections(): Promise<Collection[]> {
   return categoryAsCollections;
 }
 
-export async function getMenu(): Promise<Category[]> {
-  console.log('getMenu');
+// In-memory cache with TTL for getMenu
+let menuCache: { data: Category[] | null; generatedAt: number } = { data: null, generatedAt: 0 };
+const MENU_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in ms
+
+export const getMenu = cache(async function getMenu(): Promise<Category[]> {
+  const now = Date.now();
+  if (menuCache.data && now - menuCache.generatedAt < MENU_CACHE_TTL) {
+    return menuCache.data;
+  }
   const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
   const sortedCategories = categoriesHavingProducts.sort((a, b) =>
     a.categoryName.localeCompare(b.categoryName)
   );
+  menuCache = { data: sortedCategories, generatedAt: now };
   return sortedCategories;
-}
+});
 
 export async function getPage(handle: string): Promise<Page | undefined> {
   return undefined;
@@ -668,66 +650,21 @@ export async function revalidate(req: NextRequest): Promise<NextResponse> {
 
 async function fetchProductsPricingBatch(productIds: string[]): Promise<Record<string, any>> {
   const pricingData: Record<string, any> = {};
-
-  try {
-    // Create individual pricing promises for each product
-    const pricingPromises = productIds.map(async (productId) => {
-      try {
-        const pricingResponse = await fetchProductPricingDetails(productId);
-        return {
-          productId,
-          pricing: {
-            minVariantPrice: {
-              amount: pricingResponse.listPrice,
-              currencyCode: pricingResponse.currencyIsoCode
-            },
-            maxVariantPrice: {
-              amount: pricingResponse.unitPrice,
-              currencyCode: pricingResponse.currencyIsoCode
-            }
-          }
-        };
-      } catch (error) {
-        console.error(`Error fetching pricing for product ${productId}:`, error);
-        return {
-          productId,
-          pricing: {
-            minVariantPrice: {
-              amount: '0',
-              currencyCode: 'USD'
-            },
-            maxVariantPrice: {
-              amount: '0',
-              currencyCode: 'USD'
-            }
-          }
-        };
-      }
-    });
-
-    // Wait for all pricing requests to complete
-    const results = await Promise.all(pricingPromises);
-    results.forEach(result => {
-      pricingData[result.productId] = result.pricing;
-    });
-  } catch (error) {
-    console.error('Error in batch pricing operation:', error);
-    // Set default pricing for all requested products if batch operation fails
-    productIds.forEach(id => {
-      if (!pricingData[id]) {
-        pricingData[id] = {
-          minVariantPrice: {
-            amount: '0',
-            currencyCode: 'USD'
-          },
-          maxVariantPrice: {
-            amount: '0',
-            currencyCode: 'USD'
-          }
-        };
-      }
-    });
+  const endpoint = `${SFDC_COMMERCE_WEBSTORE_API_URL}/${SFDC_COMMERCE_WEBSTORE_ID}${PRODUCTS_PRICING_URL}${productIds}`;
+  const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
+  if (response && Array.isArray(response.pricingLineItemResults)) {
+    for (const item of response.pricingLineItemResults) {
+      pricingData[item.productId] = {
+        minVariantPrice: {
+          amount: item.listPrice,
+          currencyCode: response.currencyIsoCode || 'USD',
+        },
+        maxVariantPrice: {
+          amount: item.unitPrice,
+          currencyCode: response.currencyIsoCode || 'USD',
+        },
+      };
+    }
   }
-
   return pricingData;
 }
