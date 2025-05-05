@@ -2,14 +2,14 @@ import Link from 'next/link';
 
 import FooterMenu from 'components/layout/footer-menu';
 import LogoSquare from 'components/logo-square';
-import { Category } from 'lib/sfdc/types';
+import { Category } from 'lib/sfdc';
 import { Suspense } from 'react';
 
 const { COMPANY_NAME, SITE_NAME } = process.env;
 
-export default async function Footer({ menuPromise }: { menuPromise: Promise<Category[]> }) {
-  let menu = await menuPromise;
-  menu = menu?.slice(0, 3);
+export default async function Footer({ categoriesPromise }: { categoriesPromise: Promise<Category[]> }) {
+  let categories = await categoriesPromise;
+  categories = categories?.slice(0, 3); // show only first 3 categories
   const currentYear = new Date().getFullYear();
   const copyrightDate = 2023 + (currentYear > 2023 ? `-${currentYear}` : '');
   const skeleton = 'w-full h-6 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700';
@@ -36,7 +36,7 @@ export default async function Footer({ menuPromise }: { menuPromise: Promise<Cat
             </div>
           }
         >
-          <FooterMenu menu={menu} />
+          <FooterMenu categories={categories} />
         </Suspense>
         <div className="md:ml-auto">
           <a

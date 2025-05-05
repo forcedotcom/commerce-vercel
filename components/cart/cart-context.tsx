@@ -1,6 +1,6 @@
 'use client';
 
-import type { Cart, CartItem, Product, ProductVariant } from 'lib/sfdc/types';
+import type { Cart, CartItem, Product, ProductVariant } from 'lib/sfdc';
 import React, { createContext, use, useContext, useMemo, useOptimistic } from 'react';
 
 type UpdateType = 'plus' | 'minus' | 'delete';

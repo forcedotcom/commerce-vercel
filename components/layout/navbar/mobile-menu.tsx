@@ -6,10 +6,10 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { Fragment, Suspense, useEffect, useState } from 'react';
 
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-import { Category } from 'lib/sfdc/types';
+import { Category } from 'lib/sfdc';
 import Search, { SearchSkeleton } from './search';
 
-export default function MobileMenu({ menu }: { menu: Category[] }) {
+export default function MobileMenu({ categories }: { categories: Category[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
@@ -76,9 +76,9 @@ export default function MobileMenu({ menu }: { menu: Category[] }) {
                     <Search />
                   </Suspense>
                 </div>
-                {menu.length ? (
+                {categories.length ? (
                   <ul className="flex w-full flex-col">
-                    {menu.map((item: Category) => (
+                    {categories.map((item: Category) => (
                       <li
                         className="py-2 text-xl text-black transition-colors hover:text-neutral-500 dark:text-white"
                         key={item.categoryName}

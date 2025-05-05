@@ -8,7 +8,7 @@ export type Edge<T> = {
   node: T;
 };
 
-export type Cart = Omit<ShopifyCart, 'lines'> & {
+export type Cart = Omit<SfdcCart, 'lines'> & {
   lines: CartItem[];
 };
 
@@ -36,7 +36,7 @@ export type CartItem = {
   };
 };
 
-export type Collection = ShopifyCollection & {
+export type Collection = SfdcCollection & {
   path: string;
 };
 
@@ -45,11 +45,6 @@ export type Image = {
   altText: string;
   width: number;
   height: number;
-};
-
-export type Menu = {
-  title: string;
-  path: string;
 };
 
 export type Money = {
@@ -68,7 +63,7 @@ export type Page = {
   updatedAt: string;
 };
 
-export type Product = Omit<ShopifyProduct, 'variants' | 'images'> & {
+export type Product = Omit<SfdcProduct, 'variants' | 'images'> & {
   variants: ProductVariant[];
   images: Image[];
 };
@@ -95,7 +90,7 @@ export type SEO = {
   description: string;
 };
 
-export type ShopifyCart = {
+export type SfdcCart = {
   id: string | undefined;
   checkoutUrl: string;
   cost: {
@@ -107,7 +102,7 @@ export type ShopifyCart = {
   totalQuantity: number;
 };
 
-export type ShopifyCollection = {
+export type SfdcCollection = {
   handle: string;
   title: string;
   description: string;
@@ -115,7 +110,7 @@ export type ShopifyCollection = {
   updatedAt: string;
 };
 
-export type ShopifyProduct = {
+export type SfdcProduct = {
   id: string;
   handle: string;
   availableForSale: boolean;
@@ -135,23 +130,23 @@ export type ShopifyProduct = {
   updatedAt: string;
 };
 
-export type ShopifyCartOperation = {
+export type SfdcCartOperation = {
   data: {
-    cart: ShopifyCart;
+    cart: SfdcCart;
   };
   variables: {
     cartId: string;
   };
 };
 
-export type ShopifyCreateCartOperation = {
-  data: { cartCreate: { cart: ShopifyCart } };
+export type SfdcCreateCartOperation = {
+  data: { cartCreate: { cart: SfdcCart } };
 };
 
-export type ShopifyAddToCartOperation = {
+export type SfdcAddToCartOperation = {
   data: {
     cartLinesAdd: {
-      cart: ShopifyCart;
+      cart: SfdcCart;
     };
   };
   variables: {
@@ -163,10 +158,10 @@ export type ShopifyAddToCartOperation = {
   };
 };
 
-export type ShopifyRemoveFromCartOperation = {
+export type SfdcRemoveFromCartOperation = {
   data: {
     cartLinesRemove: {
-      cart: ShopifyCart;
+      cart: SfdcCart;
     };
   };
   variables: {
@@ -175,10 +170,10 @@ export type ShopifyRemoveFromCartOperation = {
   };
 };
 
-export type ShopifyUpdateCartOperation = {
+export type SfdcUpdateCartOperation = {
   data: {
     cartLinesUpdate: {
-      cart: ShopifyCart;
+      cart: SfdcCart;
     };
   };
   variables: {
@@ -191,19 +186,19 @@ export type ShopifyUpdateCartOperation = {
   };
 };
 
-export type ShopifyCollectionOperation = {
+export type SfdcCollectionOperation = {
   data: {
-    collection: ShopifyCollection;
+    collection: SfdcCollection;
   };
   variables: {
     handle: string;
   };
 };
 
-export type ShopifyCollectionProductsOperation = {
+export type SfdcCollectionProductsOperation = {
   data: {
     collection: {
-      products: Connection<ShopifyProduct>;
+      products: Connection<SfdcProduct>;
     };
   };
   variables: {
@@ -213,13 +208,13 @@ export type ShopifyCollectionProductsOperation = {
   };
 };
 
-export type ShopifyCollectionsOperation = {
+export type SfdcCollectionsOperation = {
   data: {
-    collections: Connection<ShopifyCollection>;
+    collections: Connection<SfdcCollection>;
   };
 };
 
-export type ShopifyMenuOperation = {
+export type SfdcMenuOperation = {
   data: {
     menu?: {
       items: {
@@ -233,36 +228,36 @@ export type ShopifyMenuOperation = {
   };
 };
 
-export type ShopifyPageOperation = {
+export type SfdcPageOperation = {
   data: { pageByHandle: Page };
   variables: { handle: string };
 };
 
-export type ShopifyPagesOperation = {
+export type SfdcPagesOperation = {
   data: {
     pages: Connection<Page>;
   };
 };
 
-export type ShopifyProductOperation = {
-  data: { product: ShopifyProduct };
+export type SfdcProductOperation = {
+  data: { product: SfdcProduct };
   variables: {
     handle: string;
   };
 };
 
-export type ShopifyProductRecommendationsOperation = {
+export type SfdcProductRecommendationsOperation = {
   data: {
-    productRecommendations: ShopifyProduct[];
+    productRecommendations: SfdcProduct[];
   };
   variables: {
     productId: string;
   };
 };
 
-export type ShopifyProductsOperation = {
+export type SfdcProductsOperation = {
   data: {
-    products: Connection<ShopifyProduct>;
+    products: Connection<SfdcProduct>;
   };
   variables: {
     query?: string;
@@ -278,7 +273,8 @@ export type Category = {
   categoryId: string;
   numberOfProducts?: number;
   path?: string;
-};
+  updatedAt?: string;
+}
 
 export type PricingApiResponse = {
   unitPrice: string,

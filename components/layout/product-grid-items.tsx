@@ -1,6 +1,6 @@
 import Grid from 'components/grid';
 import { GridTileImage } from 'components/grid/tile';
-import { Product } from 'lib/sfdc/types';
+import { Product } from 'lib/sfdc';
 import Link from 'next/link';
 
 export default function ProductGridItems({ products }: { products: Product[] }) {

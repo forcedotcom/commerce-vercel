@@ -1,4 +1,4 @@
-import { getCollectionProducts } from 'lib/sfdc';
+import { getProductsByCategories } from 'lib/sfdc';
 
 import Grid from 'components/grid';
 import ProductGridItems from 'components/layout/product-grid-items';
@@ -12,7 +12,7 @@ export default async function CategoryPage(props: {
   const params = await props.params;
   const { sort } = searchParams as { [key: string]: string };
   const { sortKey, reverse } = sorting.find((item) => item.slug === sort) || defaultSort;
-  const products = await getCollectionProducts({
+  const products = await getProductsByCategories({
     categories: [
       {
         categoryId: params.collection,

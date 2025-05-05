@@ -1,5 +1,5 @@
 import { GridTileImage } from 'components/grid/tile';
-import { Product } from 'lib/sfdc/types';
+import { Product } from 'lib/sfdc';
 import Link from 'next/link';
 
 function ThreeItemGridItem({

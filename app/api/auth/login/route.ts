@@ -1,134 +1,81 @@
 import { encode } from 'js-base64';
 import {
-    APEX_EXECUTE,
     CSRF_TOKEN_COOKIE_NAME,
-    CSRF_TOKEN_URL,
     IS_GUEST_USER_COOKIE_NAME,
     SFDC_AUTH_TOKEN_COOKIE_NAME,
-    SFDC_SITE_WEBRUNTIME_API_URL,
-    SFDC_SITE_WEBRUNTIME_URL,
 } from 'lib/constants';
+import {
+    getLoginRedirectUrl,
+    exchangeSidForLongLivedSid,
+    fetchCsrfToken
+} from 'app/api/auth/authUtil';
 import { NextRequest, NextResponse } from 'next/server';
 
+/**
+ * Handles user login by:
+ * 1. Authenticating with Salesforce and retrieving a redirect URL containing a session ID (SID).
+ * 2. Exchanging the SID for a long-lived session ID via frontdoor.jsp.
+ * 3. Fetching a CSRF token using the long-lived SID.
+ * 4. Setting authentication and session cookies for the client.
+ *
+ * Note: The CSRF token is required to perform operations on the cart for site users (e.g., adding, updating, or removing items).
+ * The frontend must include this token in requests for all cart operations to protect against CSRF attacks.
+ */
 export async function POST(req: NextRequest) {
-    const body = await req.json();
-    const { username, password } = body;
+    try {
+        // Parse credentials from request body
+        const { username, password } = await req.json();
 
-    const endpoint = SFDC_SITE_WEBRUNTIME_API_URL + APEX_EXECUTE;
+        // Step 1: Authenticate and get redirect URL with SID
+        const redirectUrl = await getLoginRedirectUrl(username, password);
+        if (!redirectUrl || !redirectUrl.includes('sid=')) {
+            return NextResponse.json({ error: 'Invalid login response' }, { status: 500 });
+        }
 
-    const payload = {
-        namespace: 'applauncher',
-        classname: 'LoginFormController',
-        method: 'loginGetPageRefUrl',
-        isContinuation: false,
-        params: {
-            username,
-            password,
-            startUrl: '',
-        },
-        cacheable: false,
-    };
+        // Step 2: Exchange for long-lived SID
+        const longLivedSid = await exchangeSidForLongLivedSid(redirectUrl);
+        if (!longLivedSid) {
+            return NextResponse.json({ error: 'SID not found in Set-Cookie' }, { status: 500 });
+        }
 
-    // Step 1: Get the redirect URL with SID
-    const resp = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
+        // Step 3: Fetch CSRF token using the long-lived SID
+        const csrfToken = await fetchCsrfToken(longLivedSid);
+        if (!csrfToken) {
+            return NextResponse.json({ error: 'CSRF token not found' }, { status: 500 });
+        }
 
-    if (!resp.ok) {
-        return NextResponse.json({ error: 'Login failed' }, { status: 401 });
+        // Step 4: Set authentication and session cookies for the client
+        // - SFDC_AUTH_TOKEN_COOKIE_NAME: Stores the long-lived SID (server authentication)
+        // - CSRF_TOKEN_COOKIE_NAME: Stores the CSRF token (client-side JS access)
+        // - IS_GUEST_USER_COOKIE_NAME: Indicates the user is not a guest
+        const res = NextResponse.json({ success: true });
+        res.cookies.set({
+            name: SFDC_AUTH_TOKEN_COOKIE_NAME,
+            value: longLivedSid,
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            path: '/',
+        });
+        res.cookies.set({
+            name: CSRF_TOKEN_COOKIE_NAME,
+            value: encode(csrfToken),
+            httpOnly: false, // MUST be accessible to client-side JS
+            secure: true,
+            sameSite: 'lax',
+            path: '/',
+        });
+        res.cookies.set(IS_GUEST_USER_COOKIE_NAME, JSON.stringify(false), {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            path: '/',
+        });
+        // Also set a response header for guest user status
+        res.headers.set('x-guest-user', JSON.stringify(false));
+        return res;
+    } catch (error) {
+        // Catch-all for unexpected errors
+        return NextResponse.json({ error: 'Unexpected error', details: String(error) }, { status: 500 });
     }
-
-    const data = await resp.json();
-    const redirectUrl = data?.returnValue;
-
-    if (!redirectUrl || !redirectUrl.includes('sid=')) {
-        return NextResponse.json({ error: 'Invalid login response' }, { status: 500 });
-    }
-
-    // Step 2: Hit frontdoor.jsp to exchange for long-lived SID
-    const fdResp = await fetch(redirectUrl, {
-        method: 'GET',
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
-
-    const setCookieHeader = fdResp.headers.get('set-cookie');
-    const sidMatch = setCookieHeader?.match(/sid=([^;]+)/);
-    const longLivedSid = sidMatch?.[1];
-
-    if (!longLivedSid) {
-        return NextResponse.json({ error: 'SID not found in Set-Cookie' }, { status: 500 });
-    }
-
-    // Step 3: Use that SID to get CSRF token
-    const csrfResp = await fetch(`${SFDC_SITE_WEBRUNTIME_URL}${CSRF_TOKEN_URL}`, {
-        method: 'GET',
-        headers: {
-            'Cookie': `sid=${longLivedSid}`,
-        },
-    });
-
-    if (!csrfResp.ok) {
-        return NextResponse.json({ error: 'Failed to fetch CSRF token' }, { status: 500 });
-    }
-
-    const reader = csrfResp.body?.getReader();
-
-    if (!reader) {
-        throw new Error('Failed to get response reader');
-    }
-
-    let raw = '';
-    const decoder = new TextDecoder('utf-8');
-
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        raw += decoder.decode(value, { stream: true });
-    }
-
-    raw += decoder.decode(); // finalize
-
-    // Now extract the token string (before Unicode escaping gets interpreted)
-    const match = raw.match(/return\s+"([^"]+)"/);
-    if (!match || !match[1]) {
-        throw new Error('CSRF token not found');
-    }
-
-    // Decode any escaped characters like \u003d using JSON.parse
-    const csrfToken = JSON.parse(`"${match[1]}"`);
-
-
-    // Step 4: Store SID as secure cookie and CSRF token in a base64 session context cookie
-    const res = NextResponse.json({ success: true });
-    res.cookies.set({
-        name: SFDC_AUTH_TOKEN_COOKIE_NAME,
-        value: longLivedSid,
-        httpOnly: true,
-        secure: true,
-        sameSite: 'none',
-        path: '/',
-    });
-
-    // Store CSRF token (and optionally firstName, guestUser, etc.)
-    res.cookies.set({
-        name: CSRF_TOKEN_COOKIE_NAME,
-        value: encode(csrfToken),
-        httpOnly: false, // MUST be accessible to client-side JS
-        secure: true,
-        sameSite: 'lax',
-        path: '/',
-    });
-
-    // Set Is Guest user to false
-    res.cookies.set(IS_GUEST_USER_COOKIE_NAME, JSON.stringify(false), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        path: '/',
-    });
-    res.headers.set('x-guest-user', JSON.stringify(false));
-
-    return res;
 }

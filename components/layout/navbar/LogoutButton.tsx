@@ -14,7 +14,7 @@ export function LogoutButton({ isGuestUser }: { isGuestUser: boolean | null }) {
       router.replace('/login');
       router.refresh(); // Ensure cookies are updated
     } else {
-      console.error('Logout failed');
+      console.log('Logout failed');
     }
   };
 

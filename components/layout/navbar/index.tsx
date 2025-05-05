@@ -1,5 +1,5 @@
 import LogoSquare from 'components/logo-square';
-import { Category } from 'lib/sfdc/types';
+import { Category } from 'lib/sfdc';
 import Link from 'next/link';
 import { Suspense, lazy } from 'react';
 import MobileMenu from './mobile-menu';
@@ -9,14 +9,14 @@ import { SFDC_COMMERCE_WEBSTORE_NAME } from 'lib/constants';
 
 const LazyCartModal = lazy(() => import('components/cart/modal'));
 
-export async function Navbar({ isGuestUser, menuPromise }: { isGuestUser: boolean | null; menuPromise: Promise<Category[]> }) {
-  let menu = await menuPromise;
-  menu = menu?.slice(0, 3);
+export async function Navbar({ isGuestUser, categoriesPromise }: { isGuestUser: boolean | null; categoriesPromise: Promise<Category[]> }) {
+  let categories = await categoriesPromise;
+  categories = categories?.slice(0, 3); // show only first 3 categories
   return (
     <nav className="relative flex items-center justify-between p-4 lg:px-6">
       <div className="block flex-none md:hidden">
         <Suspense fallback={null}>
-          <MobileMenu menu={menu} />
+          <MobileMenu categories={categories} />
         </Suspense>
       </div>
       <div className="flex w-full items-center">
@@ -31,9 +31,9 @@ export async function Navbar({ isGuestUser, menuPromise }: { isGuestUser: boolea
               {SFDC_COMMERCE_WEBSTORE_NAME}
             </div>
           </Link>
-          {menu.length ? (
+          {categories.length ? (
             <ul className="hidden gap-6 text-sm md:flex md:items-center">
-              {menu.map((item: Category) => (
+              {categories.map((item: Category) => (
                 <li key={item.categoryName}>
                   <Link
                     href={`/${item.path}`}

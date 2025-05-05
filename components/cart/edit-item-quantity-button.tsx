@@ -3,7 +3,7 @@
 import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { updateItemQuantity } from 'components/cart/actions';
-import type { CartItem } from 'lib/sfdc/types';
+import type { CartItem } from 'lib/sfdc';
 import { useActionState } from 'react';
 
 function SubmitButton({ type }: { type: 'plus' | 'minus' }) {
