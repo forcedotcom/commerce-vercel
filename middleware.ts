@@ -1,4 +1,5 @@
-import { deleteCsrfTokenCookie, deleteSfdcAuthToken, generateGuestUuid } from 'app/api/auth/authUtil';
+import { deleteCsrfTokenCookie, deleteSfdcAuthToken } from 'app/api/auth/cookieUtils';
+import { generateGuestUuid } from 'app/api/auth/authUtil';
 import { CSRF_TOKEN_COOKIE_NAME, GUEST_COOKIE_AGE, IS_GUEST_USER_COOKIE_NAME, SFDC_AUTH_TOKEN_COOKIE_NAME, SFDC_GUEST_ESSENTIAL_ID_COOKIE_NAME, } from 'lib/constants';
 import { fetchSessionContextDetails } from 'lib/sfdc';
 import { NextRequest, NextResponse } from 'next/server';

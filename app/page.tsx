@@ -1,7 +1,6 @@
 import { Carousel } from 'components/carousel';
 import { ThreeItemGrid } from 'components/grid/three-items';
-import { getCollectionProducts, getLimitedCategories, getMenu } from 'lib/sfdc';
-import { Category, Product } from 'lib/sfdc/types';
+import { getProductsByCategories, getLimitedCategories, getCategories, Category, Product } from 'lib/sfdc';
 import { Suspense } from 'react';
 import Loading from './loading';
 
@@ -26,9 +25,9 @@ export default function HomePage() {
 
 // Separate the data fetching component
 async function HomePageContent() {
-  const categories: Category[] = await getMenu();
+  const categories: Category[] = await getCategories();
   const limitedCategories: Category[] = getLimitedCategories(categories);
-  const products: Product[] = await getCollectionProducts({
+  const products: Product[] = await getProductsByCategories({
     categories: limitedCategories
   });
 

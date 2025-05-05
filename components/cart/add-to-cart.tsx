@@ -4,7 +4,7 @@ import { PlusIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { addItem } from './actions'; 
 import { useProduct } from 'components/product/product-context';
-import { Product, ProductVariant } from 'lib/sfdc/types';
+import { Product, ProductVariant } from 'lib/sfdc';
 import { useActionState } from 'react';
 import { useCart } from './cart-context';
 

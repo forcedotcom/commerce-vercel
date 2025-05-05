@@ -1,70 +1,70 @@
 import { v4 as uuidv4 } from 'uuid';
-import { NextRequest } from 'next/server';
-import { decode } from 'js-base64';
-import { ServerCookieManager } from '../../../lib/server-cookies';
+import { APEX_EXECUTE, SFDC_SITE_WEBRUNTIME_API_URL, SFDC_SITE_WEBRUNTIME_URL, CSRF_TOKEN_URL } from 'lib/constants';
 
+// If you need cookie utilities here, import from './cookieUtils'
+// import * as cookieUtils from './cookieUtils';
+
+// -----------------------------
+// Guest Utilities
+// -----------------------------
+
+/** Generate a new UUID for guest users. */
 export function generateGuestUuid() {
     return uuidv4();
 }
 
-export async function getSfdcAuthToken(): Promise<string | undefined> {
-    const cookieManager = ServerCookieManager.getInstance();
-    return await cookieManager.getAuthToken() || undefined;
+// -----------------------------
+// SFDC Login & Session Helpers
+// -----------------------------
+
+/**
+ * Authenticate with Salesforce and get a redirect URL containing a session ID (SID).
+ * Returns null if authentication fails.
+ */
+export async function getLoginRedirectUrl(username: string, password: string): Promise<string | null> {
+  const endpoint = SFDC_SITE_WEBRUNTIME_API_URL + APEX_EXECUTE;
+  const payload = {
+    namespace: 'applauncher',
+    classname: 'LoginFormController',
+    method: 'loginGetPageRefUrl',
+    isContinuation: false,
+    params: { username, password, startUrl: '' },
+    cacheable: false,
+  };
+  const resp = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) return null;
+  const data = await resp.json();
+  return data?.returnValue || null;
 }
 
-export async function getCsrfTokenFromCookie(): Promise<string | null> {
-    const cookieManager = ServerCookieManager.getInstance();
-    const token = await cookieManager.getCsrfToken();
-    if (!token) return null;
-    return decode(token);
+/**
+ * Exchange the redirect URL for a long-lived SID by hitting frontdoor.jsp.
+ * Returns the SID string or null if not found.
+ */
+export async function exchangeSidForLongLivedSid(redirectUrl: string): Promise<string | null> {
+  const fdResp = await fetch(redirectUrl, {
+    method: 'GET',
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+  });
+  const setCookieHeader = fdResp.headers.get('set-cookie');
+  return setCookieHeader?.match(/sid=([^;]+)/)?.[1] || null;
 }
 
-export async function getIsGuestUserFromCookie(): Promise<boolean | null> {
-    const cookieManager = ServerCookieManager.getInstance();
-    return await cookieManager.getIsGuestUser();
-}
-
-export async function getCartIdFromCookie(): Promise<string | null> {
-    const cookieManager = ServerCookieManager.getInstance();
-    return await cookieManager.getCartId();
-}
-
-export async function getGuestCartSessionUuid(req?: NextRequest): Promise<string | null | undefined> {
-    const cookieManager = ServerCookieManager.getInstance(req);
-    return await cookieManager.getGuestCartSessionUuid();
-}
-
-export async function getGuestEssentialUuidFromCookie(): Promise<string | null> {
-    const cookieManager = ServerCookieManager.getInstance();
-    return await cookieManager.getGuestEssentialUuid();
-}
-
-export async function setCartIdInCookie(cartId: string) {
-    const cookieManager = ServerCookieManager.getInstance();
-    await cookieManager.setCartId(cartId);
-}
-
-export async function updateIsGuestUserToDefaultInCookie() {
-    const cookieManager = ServerCookieManager.getInstance();
-    await cookieManager.setIsGuestUser(true);
-}
-
-export async function deleteSfdcAuthToken(): Promise<void> {
-    const cookieManager = ServerCookieManager.getInstance();
-    await cookieManager.deleteAuthToken();
-}
-
-export async function deleteGuestCartSessionIdCookie(): Promise<void> {
-    const cookieManager = ServerCookieManager.getInstance();
-    await cookieManager.deleteGuestCartSessionUuid();
-}
-
-export async function deleteCartIdCookie(): Promise<void> {
-    const cookieManager = ServerCookieManager.getInstance();
-    await cookieManager.deleteCartId();
-}
-
-export async function deleteCsrfTokenCookie(): Promise<void> {
-    const cookieManager = ServerCookieManager.getInstance();
-    await cookieManager.deleteCsrfToken();
+/**
+ * Fetch a CSRF token using the long-lived SID.
+ * Returns the token string or null if not found.
+ */
+export async function fetchCsrfToken(longLivedSid: string): Promise<string | null> {
+  const csrfResp = await fetch(`${SFDC_SITE_WEBRUNTIME_URL}${CSRF_TOKEN_URL}`, {
+    method: 'GET',
+    headers: { 'Cookie': `sid=${longLivedSid}` },
+  });
+  if (!csrfResp.ok) return null;
+  const raw = await csrfResp.text();
+  const match = raw.match(/return\s+"([^"]+)"/);
+  return match && match[1] ? JSON.parse(`"${match[1]}"`) : null;
 }

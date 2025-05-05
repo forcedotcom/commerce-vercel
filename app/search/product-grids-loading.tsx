@@ -1,5 +1,8 @@
 import Grid from 'components/grid';
 
+// This loading skeleton is specifically for product grids (e.g., on the search page)
+// It visually mimics the product grid layout while data is loading.
+
 export default function Loading() {
   return (
     <>

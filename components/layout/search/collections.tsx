@@ -1,12 +1,23 @@
 import clsx from 'clsx';
 import { Suspense } from 'react';
 
-import { getCollections } from 'lib/sfdc';
+import { getCategories, Collection } from 'lib/sfdc';
 import FilterList from './filter';
 
 async function CollectionList() {
-  const collections = await getCollections();
-  return <FilterList list={collections} title="Collections" />;
+  const categories = await getCategories();
+  const categoryAsCollections: Collection[] = categories.map((obj) => ({
+    title: obj.categoryName,
+    handle: '',
+    description: obj.categoryName,
+    seo: {
+      title: obj.categoryName,
+      description: obj.categoryName
+    },
+    path: `/search/${obj.categoryId}`,
+    updatedAt: new Date().toISOString()
+  }));
+  return <FilterList list={categoryAsCollections} title="Collections" />;
 }
 
 const skeleton = 'mb-3 h-4 w-5/6 animate-pulse rounded';

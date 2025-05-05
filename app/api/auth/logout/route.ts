@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { deleteCartIdCookie, deleteCsrfTokenCookie, deleteSfdcAuthToken, updateIsGuestUserToDefaultInCookie } from 'app/api/auth/authUtil';
+import { deleteCartIdCookie, deleteCsrfTokenCookie, deleteSfdcAuthToken, updateIsGuestUserToDefaultInCookie } from 'app/api/auth/cookieUtils';
 
 export async function POST() {
   await deleteSfdcAuthToken();

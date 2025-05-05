@@ -163,4 +163,37 @@ If you run into issues:
 ## Additional Resources
 
 - [Next.js Documentation](https://nextjs.org/docs)
-- [Salesforce Commerce Cloud Documentation](https://developer.salesforce.com/docs/commerce/commerce-cloud) 
+- [Salesforce Commerce Cloud Documentation](https://developer.salesforce.com/docs/commerce/commerce-cloud)
+
+## Comprehensive SFDC API Endpoint Reference
+
+This project interacts with Salesforce Commerce Cloud (SFDC) using the following API endpoints:
+
+| #  | API Name                                         | HTTP Method | Endpoint URL                                                                                                                                                                                                 | REST API Reference |
+|----|--------------------------------------------------|-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------|
+| 1  | Get Parent Categories                            | GET         | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/product-categories/children                                      | [Commerce Webstore Product Categories Children](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_product_categories_children.htm) |
+| 2  | Get child categories based on given parent category id | GET         | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/product-categories/children?parentProductCategoryId={PARENT_CATEGORY_ID} | [Commerce Webstore Product Category](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_product_category.htm) |
+| 3  | Get product details based on given category id    | GET         | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/search/products?categoryId={CATEGORY_ID}&pageSize=10              | [Commerce Webstore Search Products](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_search_products.htm) |
+| 4  | Get product pricing details based on given product ids | GET         | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/pricing/products?productIds={LIST_OF_PRODUCT_IDS}                 | [Commerce Webstore Pricing Products](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_pricing_products.htm) |
+| 5  | Create a cart                                    | PUT         | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/carts/current                                                     | [Commerce Webstore Cart](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_cart.htm) |
+| 6  | Get cart details                                 | GET         | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/carts/current                                                     | [Commerce Webstore Cart](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_cart.htm) |
+| 7  | Get cart item details                            | GET         | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/carts/current/cart-items                                          | [Commerce Webstore Cart Items](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_cart_items.htm) |
+| 8  | Add a item to cart                               | POST        | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/carts/current/cart-items                                          | [Commerce Webstore Cart Items](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_cart_items.htm) |
+| 9  | Update cart item quantity                        | PATCH       | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/carts/current/cart-items/{CART_ITEM_ID}                           | [Commerce Webstore Cart Item](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_cart_item.htm) |
+| 10 | Remove a item from cart                          | DELETE      | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/carts/current/cart-items/{CART_ITEM_ID}                           | [Commerce Webstore Cart Item](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_cart_item.htm) |
+| 11 | Get product details based on given product id    | GET         | {SFDC_COMMERCE_WEBSTORE_SITE_URL}/webruntime/api/services/data/{SFDC_COMMERCE_API_VERSION}/commerce/webstores/{SFDC_COMMERCE_WEBSTORE_ID}/products/{PRODUCT_ID}                                            | [Commerce Webstore Product](https://developer.salesforce.com/docs/atlas.en-us.chatterapi.meta/chatterapi/connect_resources_commerce_webstore_product.htm) |
+
+**Legend:**
+- `{SFDC_COMMERCE_WEBSTORE_SITE_URL}` = Your Commerce Cloud site URL
+- `{SFDC_COMMERCE_API_VERSION}` = API version (e.g., v64.0)
+- `{SFDC_COMMERCE_WEBSTORE_ID}` = Your webstore ID
+- `{PARENT_CATEGORY_ID}` = The parent category ID
+- `{CATEGORY_ID}` = The category ID
+- `{LIST_OF_PRODUCT_IDS}` = Comma-separated product IDs
+- `{CART_ITEM_ID}` = The cart item ID
+- `{PRODUCT_ID}` = The product ID
+
+**Example URL:**
+```
+https://abcd.my.site.com/abcd/webruntime/api/services/data/v64.0/commerce/webstores/0ZE000000000000/product-categories/children
+```

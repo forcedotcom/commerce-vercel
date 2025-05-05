@@ -3,7 +3,7 @@ import ProductGridItems from 'components/layout/product-grid-items';
 import { defaultSort, sorting } from 'lib/constants';
 import { getProducts } from 'lib/sfdc';
 import { Suspense } from 'react';
-import Loading from './loading';
+import Loading from './product-grids-loading';
 
 export const metadata = {
   title: 'Search',

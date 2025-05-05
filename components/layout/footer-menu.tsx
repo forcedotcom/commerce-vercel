@@ -1,7 +1,7 @@
 'use client';
 
 import clsx from 'clsx';
-import { Category } from 'lib/sfdc/types';
+import { Category } from 'lib/sfdc';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -31,13 +31,13 @@ export function FooterMenuItem({ item }: { item: Category }) {
   );
 }
 
-export default function FooterMenu({ menu }: { menu: Category[] }) {
-  if (!menu.length) return null;
+export default function FooterMenu({ categories }: { categories: Category[] }) {
+  if (!categories.length) return null;
 
   return (
     <nav>
       <ul>
-        {menu.map((item: Category) => {
+        {categories.map((item: Category) => {
           return <FooterMenuItem key={item.categoryName} item={item} />;
         })}
       </ul>

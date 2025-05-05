@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { Suspense } from 'react';
 import { getProduct } from 'lib/sfdc';
 import { HIDDEN_PRODUCT_TAG } from 'lib/constants';
 import { ProductDescription } from 'components/product/product-description';
