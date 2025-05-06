@@ -16,30 +16,6 @@ import { HttpMethod } from 'lib/sfdc/sfdcApiUtil';
 let categoriesCache: { data: Category[] | null; generatedAt: number } = { data: null, generatedAt: 0 };
 const CATEGORIES_CACHE_TTL = 2 * 60 * 1000; // 2 minutes in ms
 
-/**
- * Fetches all categories from the SFDC API, including parent and child categories.
- * @returns {Promise<Category[]>} An array of all categories.
- */
-export async function getAllCategoryDetails() {
-  // get parent categories
-  const parentCategories = await fetchParentCategories();
-
-  // get child categories
-  const childCategories = await fetchChildCategories(parentCategories);
-
-  const allcategories = parentCategories.concat(childCategories);
-  return allcategories;
-}
-
-/**
- * Returns only categories that have products.
- * @returns {Promise<Category[]>} An array of categories with products.
- */
-export async function getAllCategoriesHavingProducts(): Promise<Category[]> {
-  const categories = await getAllCategoryDetails();
-  return categories.filter(category => category.numberOfProducts != null && category.numberOfProducts > 0);
-}
-
 async function fetchParentCategories(): Promise<Category[]> {
   let results: Category[] = [];
   try {
@@ -126,16 +102,26 @@ export const getCategories = cache(async function getCategories(): Promise<Categ
   if (categoriesCache.data && now - categoriesCache.generatedAt < CATEGORIES_CACHE_TTL) {
     return categoriesCache.data;
   }
-  const categoriesHavingProducts: Category[] = await getAllCategoriesHavingProducts();
-  const sortedCategories = categoriesHavingProducts.sort((a, b) =>
+
+  // get parent categories
+  const parentCategories = await fetchParentCategories();
+
+  // get child categories
+  const childCategories = await fetchChildCategories(parentCategories);
+
+  const allcategories = parentCategories.concat(childCategories);
+
+  const sortedCategories = allcategories.sort((a, b) =>
     a.categoryName.localeCompare(b.categoryName)
   );
+
   categoriesCache = { data: sortedCategories, generatedAt: now };
   return sortedCategories;
 });
 
 /**
  * Returns a limited set of categories such that the total number of products does not exceed maxProducts.
+ * This is used to limit the number of products displayed on the home page to increase the performance.
  * @param {Category[]} categories - The list of categories to filter.
  * @param {number} [maxProducts=10] - The maximum number of products to include.
  * @returns {Category[]} The limited set of categories.
