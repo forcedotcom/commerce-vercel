@@ -39,7 +39,7 @@ export async function addToCart(
   };
   const response = await makeSfdcApiCall(endpoint, HttpMethod.POST, requestBody);
   // Add a 2-second delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await new Promise(resolve => setTimeout(resolve, 4000));
   const text = await response.text();
   return mapCart(text ? JSON.parse(text) : null);
 }
