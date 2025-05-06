@@ -8,6 +8,7 @@ import {
 import { Cart, CartItem } from './types';
 import { makeSfdcApiCall, HttpMethod } from './sfdcApiUtil';
 import { cookies } from 'next/headers';
+import { getCartIdFromCookie, setCartIdInCookie } from 'app/api/auth/cookieUtils';
 
 /**
  * Creates a new cart and stores the guest cart session ID in cookies if present in the response headers.
@@ -19,7 +20,11 @@ export async function createCart(): Promise<Cart> {
   const response = await makeSfdcApiCall(endpoint, HttpMethod.PUT);
   await extractGuestCartSessionIdFromResponseHeaders(response);
   const text = await response.text();
-  return mapCart(text ? JSON.parse(text) : null);
+  const cart = mapCart(text ? JSON.parse(text) : null);
+  if (cart && cart.id) {
+    setCartIdInCookie(cart.id);
+  }
+  return cart;
 }
 
 /**
@@ -30,6 +35,10 @@ export async function createCart(): Promise<Cart> {
 export async function addToCart(
   lines: { productId: string; quantity: number, type: string }
 ): Promise<Cart> {
+  const cartId = await getCartIdFromCookie();
+  if (!cartId) {
+    await createCart();
+  }
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_ITEMS_URL;
   const requestBody = {
@@ -38,8 +47,8 @@ export async function addToCart(
     type: lines.type,
   };
   const response = await makeSfdcApiCall(endpoint, HttpMethod.POST, requestBody);
-  // Add a 4-second delay, as the cart API takes a few seconds to update the cart
-  await new Promise(resolve => setTimeout(resolve, 4000));
+  // Add a 2-second delay, as the cart API takes a few seconds to update the cart
+  await new Promise(resolve => setTimeout(resolve, 2000));
   const text = await response.text();
   return mapCart(text ? JSON.parse(text) : null);
 }
@@ -80,6 +89,10 @@ export async function updateCart(
  * @returns {Promise<Cart | undefined>} The cart object, or undefined if not found.
  */
 export async function getCart(): Promise<Cart | undefined> {
+  const cartId = await getCartIdFromCookie();
+  if (!cartId) {
+    return undefined;
+  }
   const endpoint =
     SFDC_COMMERCE_WEBSTORE_API_URL + '/' + SFDC_COMMERCE_WEBSTORE_ID + CARTS_CURRENT_URL;
   const cartResponse = await makeSfdcApiCall(endpoint, HttpMethod.GET);

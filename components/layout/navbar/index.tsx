@@ -9,7 +9,13 @@ import { SFDC_COMMERCE_WEBSTORE_NAME } from 'lib/constants';
 
 const LazyCartModal = lazy(() => import('components/cart/modal'));
 
-export async function Navbar({ isGuestUser, categoriesPromise }: { isGuestUser: boolean | null; categoriesPromise: Promise<Category[]> }) {
+export async function Navbar({
+  isGuestUser,
+  categoriesPromise
+}: {
+  isGuestUser: boolean | null;
+  categoriesPromise: Promise<Category[]>;
+}) {
   let categories = await categoriesPromise;
   categories = categories?.slice(0, 3); // show only first 3 categories
   return (
@@ -54,11 +60,9 @@ export async function Navbar({ isGuestUser, categoriesPromise }: { isGuestUser: 
         </div>
         <div className="flex justify-end md:w-1/3">
           <LogoutButton isGuestUser={isGuestUser} />
-          {isGuestUser !== null && (
-            <Suspense fallback={<div className="h-11 w-11" />}>
-              <LazyCartModal />
-            </Suspense>
-          )}
+          <Suspense fallback={<div className="h-11 w-11" />}>
+            <LazyCartModal />
+          </Suspense>
         </div>
       </div>
     </nav>

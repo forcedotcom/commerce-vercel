@@ -80,17 +80,10 @@ export async function createCartAndSetCookie() {
   try {
     const cartId = await getCookie('cartId');
     if (cartId) {
-      return cartId;
+      return;
     }
-
-    const response = await createCart();
-    if (response?.id) {
-      setCartIdInCookie(response.id);
-      return response.id;
-    }
-    return null;
+    await createCart();
   } catch (error) {
     console.error('Error creating cart:', error);
-    return null;
   }
 }

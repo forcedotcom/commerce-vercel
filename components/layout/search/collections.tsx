@@ -17,7 +17,7 @@ async function CollectionList() {
     path: `/search/${obj.categoryId}`,
     updatedAt: new Date().toISOString()
   }));
-  return <FilterList list={categoryAsCollections} title="Collections" />;
+  return <FilterList list={categoryAsCollections} title="Categories" />;
 }
 
 const skeleton = 'mb-3 h-4 w-5/6 animate-pulse rounded';

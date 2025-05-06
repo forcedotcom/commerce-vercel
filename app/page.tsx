@@ -28,7 +28,8 @@ async function HomePageContent() {
   const categories: Category[] = await getCategories();
   const limitedCategories: Category[] = getLimitedCategories(categories);
   const products: Product[] = await getProductsByCategories({
-    categories: limitedCategories
+    categories: limitedCategories,
+    pageSize: 3
   });
 
   return (

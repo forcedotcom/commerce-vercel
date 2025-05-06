@@ -41,22 +41,20 @@ export const metadata = {
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const isGuestUser = await getIsGuestUserFromCookie();
   const categoriesPromise = getCategories();
-  
-  const cartPromise: Promise<Cart | undefined> = isGuestUser !== null 
-    ? getCart() 
+
+  const cartPromise: Promise<Cart | undefined> = (await getCartIdFromCookie())
+    ? getCart()
     : Promise.resolve(undefined);
 
   return (
     <html lang="en" className={GeistSans.variable}>
-      <body className="bg-neutral-50 text-black selection:bg-teal-300 dark:bg-neutral-900 dark:text-white dark:selection:bg-pink-500 dark:selection:text-white min-h-screen flex flex-col">
+      <body className="flex min-h-screen flex-col bg-neutral-50 text-black selection:bg-teal-300 dark:bg-neutral-900 dark:text-white dark:selection:bg-pink-500 dark:selection:text-white">
         <CartProvider cartPromise={cartPromise}>
           <Suspense fallback={<div className="h-16 w-full animate-pulse bg-neutral-100" />}>
             <Navbar isGuestUser={isGuestUser} categoriesPromise={categoriesPromise} />
           </Suspense>
           <main className="flex-grow">
-            <Suspense fallback={<Loading />}>
-              {children}
-            </Suspense>
+            <Suspense fallback={<Loading />}>{children}</Suspense>
             <Toaster closeButton />
             <WelcomeToast />
           </main>

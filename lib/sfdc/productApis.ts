@@ -26,10 +26,12 @@ export async function getProductsByCategories({
     categories,
     reverse,
     sortKey,
+    pageSize
 }: {
     categories: Category[];
     reverse?: boolean;
     sortKey?: string;
+    pageSize?: number;
 }): Promise<Product[]> {
     // Fetch products based on categories (inline logic from fetchCategoryProducts)
     const productPromises = categories.map(async (category) => {
@@ -39,7 +41,7 @@ export async function getProductsByCategories({
                 '/' +
                 SFDC_COMMERCE_WEBSTORE_ID +
                 CATEGORY_PRODUCTS_SEARCH_URL +
-                category.categoryId + '&pageSize=3';
+                category.categoryId + '&pageSize=' + pageSize;
 
             const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
             const text = await response.text();
