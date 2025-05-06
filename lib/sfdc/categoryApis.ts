@@ -14,7 +14,7 @@ import { HttpMethod } from 'lib/sfdc/sfdcApiUtil';
 
 // In-memory cache with TTL for getCategories
 let categoriesCache: { data: Category[] | null; generatedAt: number } = { data: null, generatedAt: 0 };
-const CATEGORIES_CACHE_TTL = 2 * 60 * 1000; // 2 minutes in ms
+const CATEGORIES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in ms
 
 async function fetchParentCategories(): Promise<Category[]> {
   let results: Category[] = [];
@@ -126,7 +126,7 @@ export const getCategories = cache(async function getCategories(): Promise<Categ
  * @param {number} [maxProducts=10] - The maximum number of products to include.
  * @returns {Category[]} The limited set of categories.
  */
-export function getLimitedCategories(categories: Category[], maxProducts = 10): Category[] {
+export function getLimitedCategories(categories: Category[], maxProducts = 3): Category[] {
   let selectedCategories: Category[] = [];
   let totalProducts = 0;
 

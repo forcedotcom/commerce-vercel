@@ -4,7 +4,6 @@ import { deleteCartIdCookie, deleteCsrfTokenCookie, deleteSfdcAuthToken, updateI
 export async function POST() {
   await deleteSfdcAuthToken();
   await deleteCsrfTokenCookie();
-  await deleteCartIdCookie();
   await updateIsGuestUserToDefaultInCookie();
   return NextResponse.json({ success: true }, { status: 200 });
 }
