@@ -38,7 +38,7 @@ export async function addToCart(
     type: lines.type,
   };
   const response = await makeSfdcApiCall(endpoint, HttpMethod.POST, requestBody);
-  // Add a 2-second delay
+  // Add a 4-second delay, as the cart API takes a few seconds to update the cart
   await new Promise(resolve => setTimeout(resolve, 4000));
   const text = await response.text();
   return mapCart(text ? JSON.parse(text) : null);
