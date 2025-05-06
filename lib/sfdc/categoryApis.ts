@@ -126,7 +126,7 @@ export const getCategories = cache(async function getCategories(): Promise<Categ
  * @param {number} [maxProducts=10] - The maximum number of products to include.
  * @returns {Category[]} The limited set of categories.
  */
-export function getLimitedCategories(categories: Category[], maxProducts = 10): Category[] {
+export function getLimitedCategories(categories: Category[], maxProducts = 3): Category[] {
   let selectedCategories: Category[] = [];
   let totalProducts = 0;
 

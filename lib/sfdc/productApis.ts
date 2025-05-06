@@ -39,7 +39,7 @@ export async function getProductsByCategories({
                 '/' +
                 SFDC_COMMERCE_WEBSTORE_ID +
                 CATEGORY_PRODUCTS_SEARCH_URL +
-                category.categoryId + '&pageSize=7';
+                category.categoryId + '&pageSize=3';
 
             const response = await makeSfdcApiCall(endpoint, HttpMethod.GET);
             const text = await response.text();
